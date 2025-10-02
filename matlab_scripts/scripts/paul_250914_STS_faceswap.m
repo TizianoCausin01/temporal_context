@@ -1,22 +1,23 @@
 clear all
 close all
-
-addpath('/n/data2/hms/neurobio/livingstone/Code/data_loading_code_peter_branch')
-addpath('/n/data2/hms/neurobio/livingstone/Code/matpl')
-addpath('/n/data2/hms/neurobio/livingstone/marge/margemonkeys/complexities')
-addpath('/n/data2/hms/neurobio/livingstone/Code/npy-matlab-master')
-addpath('/n/data2/hms/neurobio/livingstone/Stimuli/fewerOO')
-addpath(genpath('/n/data2/hms/neurobio/livingstone/Code/umapAndEppFileExchange_4_5'))
-addpath('/n/data2/hms/neurobio/livingstone/Data/Ephys-Raw')
+addpath("../src")
+paths = get_paths()
+addpath(sprintf('%s/Code/data-loading-code-peterbranch', paths.livingstone_lab))
+addpath(sprintf('%s/Code/matpl', paths.livingstone_lab))
+addpath(sprintf('%s/marge/margemonkeys/complexities', paths.livingstone_lab))
+addpath(sprintf('%s/Code/npy-matlab-master', paths.livingstone_lab))
+addpath(sprintf('%s/Stimuli/fewerOO', paths.livingstone_lab))
+addpath(genpath(sprintf('%s/Code/umapAndEppFileExchange_4_5', paths.livingstone_lab)))
+addpath(sprintf('%s/Data/Data-Ephys-Raw', paths.livingstone_lab))
 
 %% Parameters
 % data locations
-data_formatted = '/n/data2/hms/neurobio/livingstone/Data/Formatted/';
-data_neuropixel = '/n/data2/hms/neurobio/livingstone/Data/Npx-Preprocessed/';
+data_formatted = sprintf('%s/Data/Data-Formatted/', paths.livingstone_lab);
+data_neuropixel = sprintf('%s/Data/Data-Neuropixels-Preprocessed/', paths.livingstone_lab);
 % addpath('./npy-matlab-master/npy-matlab/')
 % [meta,rasters,lfps,Trials] = loadFormattedData('dat123879001.plx', 'expControlFN', '200201_red_screening_omniplex.bhv2', ...
 %     'expControl','ML','equipment','PLEXON', 'rasterWindow',[0 300], 'savepsth',1,'alignToPhotodiode',0,'continuous',0);
-image_dir = '/n/data2/hms/neurobio/livingstone/Stimuli/faceswap_4/';
+image_dir = sprintf('%s/Stimuli/faceswap_4/', paths.livingstone_lab);
 addpath(genpath(image_dir));
 % goodch=[1 3 10 12 23 36 45 61 62];
 colorjet=colormap(jet);
