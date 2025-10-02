@@ -1,4 +1,5 @@
 tiziano_local:
   paths:
     src_path: "/Users/tizianocausin/Desktop/temporal_context/python_scripts/src"
-
+    matlab_src_path: "/Users/tizianocausin/Desktop/temporal_context/matlab_scripts/src"
+    livingstone_lab: "/Volumes/LivingstoneLab"
