@@ -4,7 +4,18 @@ import copy
 sys.path.append("..")
 from general_utils.utils import print_wise
 
+"""
+format_in_trials
+From the raster, stimuli and trials objects, it gives two dicts (neural and gaze dicts) with the formatted trials.
+INPUT:
+    - file_list: list{str} -> a list with all the stimulus names
+    - len_avg_window: np.float -> how much we want to average out our 1000Hz neural and eye-tracking signals
+    - rasters: np.ndarray (timepts x channels) -> the whole experiment neural signal 
+    - trials, stimuli -> the objects loaded from the experiment.mat file
 
+OUTPUT:
+    - final_res_neural, final_res_gaze: dict{str, np.ndarray{3D}} -> dictionaries with the stimuli names as keys and 3D np.ndarrays (channels x timepts x trials)  
+"""
 def format_in_trials(file_list, len_avg_window, rasters, trials, stimuli):
     unique_stimuli_names = set(file_list)
     final_res_neural = {name : [] for name in unique_stimuli_names}
@@ -31,6 +42,7 @@ def format_in_trials(file_list, len_avg_window, rasters, trials, stimuli):
             neural_signal = rasters[trial_start_int:trial_end_int, :].T  # slices the trial from raster
             trial_firing_rate = get_firing_rate(bins, neural_signal)
             trial_gaze = get_firing_rate(bins, gaze_signal)
+            trial_gaze = convert_gaze_coordinates(trial_gaze)
             final_res_neural[fn].append(trial_firing_rate)
             final_res_gaze[fn].append(trial_gaze)
         # if trials[trial_number]["success"] == 1 and stimuli[idx]["filename"] == fn:
@@ -40,7 +52,13 @@ def format_in_trials(file_list, len_avg_window, rasters, trials, stimuli):
     return final_res_neural, final_res_gaze
 
 """
-Creates the bins for computing the firing rate
+create_bins
+Creates the bins for computing the firing rate by defining a range with a certain step and converting to int (because we assume the resolution of the signal is at 1000Hz.
+INPUT:
+    - trial_duration: int -> the duration of the trial
+    - len_avg_window: np.float -> the length of the window
+OUTPUT:
+    - bins: np.ndarray -> the onsets of each bin to average in get_firing_rate
 """
 def create_bins(trial_duration, len_avg_window):
     bins = np.round(np.arange(0, trial_duration, len_avg_window)).astype(int)  # bins the target trial with the required resolution, convert to int for later indexing
@@ -49,6 +67,15 @@ def create_bins(trial_duration, len_avg_window):
 # EOF
 
 
+"""
+get_firing_rate
+Smooths and downsamples the neural or gaze signal to the desired resolution, identified by bins.
+INPUT:
+    - bins: np.ndarray -> defined in create bins, they are the onset indeces 
+    - neural_signal: np.ndarray -> the neural signal of a trial
+OUTPUT: 
+    - trial_firing_rate: np.ndarray -> the firing rate of a trial
+"""
 def get_firing_rate(bins, neural_signal):
     trial_firing_rate = []
     
@@ -62,6 +89,16 @@ def get_firing_rate(bins, neural_signal):
     return trial_firing_rate
 # EOF
 
+
+"""
+cut_excess_timepoints
+Cuts the excess datapoints in the data dict lists before stacking them together. It's needed due to duration timing inconsistencies between different repetitions of the same trial.
+INPUT:
+    - data_dict: dict{str, list} -> the data dictionary still with lists as values (each element of the list is a separate trial of the same stimulus, represented as features x timepoints)
+
+OUTPUT:
+    - data_dict: dict{str, np.ndarray} -> the data dictionary with 3D arrays as values (features x timepoints x trials). We trim the last datapoints (usually 0 or 1) to make trials of the same length
+"""
 
 def cut_excess_timepoints(data_dict):
     dict_keys = list(data_dict.keys())
@@ -81,4 +118,21 @@ def cut_excess_timepoints(data_dict):
         data_dict[key] = np.stack(data_dict[key], axis=2)
     # end for key in data_dict.keys():
     return data_dict
+# EOF
+
+
+"""
+convert_gaze_coordinates
+Converts the eye-tracking signal into pixels coordinates (1080 x 1920 resolution).
+Since the initial reference frame has the origin at the center of the screen we have to add width/2 on the x and subtract height/2 on the y. 
+The *32 is a multiplicative factor to convert the original unit of measure for gaze into pixels of that size.
+INPUT:
+    - gaze: np.ndarray (2, timepoints)
+OUTPUT:
+    - gaze: np.ndarray (2, timepoints)
+"""
+def convert_gaze_coordinates(gaze):
+    gaze[0, :] = 960 + gaze[0, :]*32
+    gaze[1, :] = 540 - gaze[1, :]*32
+    return gaze 
 # EOF
