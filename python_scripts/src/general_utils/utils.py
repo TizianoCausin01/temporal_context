@@ -92,3 +92,21 @@ def get_lagplot(corr_mat, max_lag=20, min_datapts=10, symmetric=False):
             lagplot[tau] = np.nanmean(d)
     return lagplot
 # EOF
+
+def split_integer(total: int, n: int):
+    """Split total into n nearly equal integer parts."""
+    base = total // n
+    remainder = total % n
+    # distribute the remainder (one extra for the first 'remainder' chunks)
+    parts = [base + 1 if i < remainder else base for i in range(n)]
+    return parts
+# EOF
+
+def make_intervals(total: int, n: int):
+    parts = split_integer(total, n)
+    intervals = []
+    start = 0
+    for p in parts:
+        intervals.append((start, p))
+        start = start+p
+    return intervals
