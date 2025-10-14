@@ -1,5 +1,4 @@
 from datetime import datetime
-from numba import njit
 import numpy as np
 def print_wise(mex, rank=None):
     if rank == None:
@@ -45,7 +44,6 @@ INPUT:
 OUTPUT:
     - corr_mat: np.ndarray(float) -> (tpts x tpts) the matrix of cross-correlation
 """
-@njit
 def autocorr_mat(data, data2=None):
     if data2 == None:
         corr_mat = np.corrcoef(data, rowvar=False)
