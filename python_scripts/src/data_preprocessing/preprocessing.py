@@ -136,3 +136,44 @@ def convert_gaze_coordinates(gaze):
     gaze[1, :] = 540 - gaze[1, :]*32
     return gaze 
 # EOF
+
+def wrapper_load_and_save(paths, experiment_name, imec, resolution_Hz, npx=True):
+    if npx == True:
+        neural_out_fn=f"{paths['livingstone_lab']}/tiziano/data/neural_{experiment_name}_imec{imec}_{resolution_Hz}Hz.pkl"
+        gaze_out_fn=f"{paths['livingstone_lab']}/tiziano/data/gaze_{experiment_name}_imec{imec}_{resolution_Hz}Hz.pkl"
+    else:
+        neural_out_fn=f"{paths['livingstone_lab']}/tiziano/data/neural_{experiment_name}_plx_{resolution_Hz}Hz.pkl"
+        gaze_out_fn=f"{paths['livingstone_lab']}/tiziano/data/gaze_{experiment_name}_plx_{resolution_Hz}Hz.pkl"
+
+    # end if npx == True:
+    if os.path.exists(neural_out_fn) & os.path.exists(gaze_out_fn):
+        print_wise(f"paths {neural_out_fn} already exist")
+        return 
+    # end if os.path.exists(neural_out_fn) & os.path.exists(gaze_out_fn):
+
+    data_path = f"{paths['data_formatted']}/{experiment_name}_experiment.mat"
+    d = loadmat(data_path)
+    trials = d["Trials"]
+    stimuli = d["Stimuli"]
+    print_wise("Start loading rasters...")
+    if npx == False:
+        rasters_path = f"{paths['data_formatted']}/{experiment_name}-rasters.h5"
+        with h5py.File(rasters_path, "r") as f:
+            rasters = f["rasters"][:]
+    elif npx == True:
+        rasters_path = f"{paths['data_neuropixels']}/{experiment_name}/catgt_{experiment_name}_g0/{experiment_name}_g0_imec{imec}/{experiment_name}-imec{imec}-mua_cont.h5"
+        with h5py.File(rasters_path, "r") as f:
+            rasters = f["mua_cont"][:]
+    # end if npx == False:
+    print_wise("Finished loading rasters")
+
+    s = np.concatenate(stimuli["filename"])
+    file_list = [str(x[0]) for x in s]
+    len_window_firing_rate = 1000/parms['resolution_Hz']
+    neural, gaze = format_in_trials(file_list, len_window_firing_rate, rasters, trials, stimuli)
+
+    with open(neural_out_fn, "wb") as f:
+        pickle.dump(neural, f)
+    with open(gaze_out_fn, "wb") as f:
+        pickle.dump(gaze, f)
+# EOF
