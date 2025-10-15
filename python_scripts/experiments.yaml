@@ -3,3 +3,74 @@ paul_250914_npx0:
   resolution_Hz: 60
   npx: true
   imec: 0
+
+paul_250914_npx1:
+  experiment_name: "paul_250914"
+  resolution_Hz: 60
+  npx: true
+  imec: 1
+
+paul_250914_plx:
+  experiment_name: "paul_20250914"
+  resolution_Hz: 60
+  npx: false 
+  imec: 0
+
+ 
+paul_250914_npx0:
+  experiment_name: "paul_250914"
+  resolution_Hz: 60
+  npx: true
+  imec: 0
+
+paul_250914_npx1:
+  experiment_name: "paul_250914"
+  resolution_Hz: 60
+  npx: true
+  imec: 1
+
+paul_250914_plx:
+  experiment_name: "paul_20250914"
+  resolution_Hz: 60
+  npx: false 
+  imec: 0
+
+
+paul_250914_npx0:
+  experiment_name: "paul_250914"
+  resolution_Hz: 60
+  npx: true
+  imec: 0
+
+paul_250914_npx1:
+  experiment_name: "paul_250914"
+  resolution_Hz: 60
+  npx: true
+  imec: 1
+
+paul_250914_plx:
+  experiment_name: "paul_20250914"
+  resolution_Hz: 60
+  npx: false 
+  imec: 0
+
+
+paul_250914_npx0:
+  experiment_name: "paul_250914"
+  resolution_Hz: 60
+  npx: true
+  imec: 0
+
+paul_250914_npx1:
+  experiment_name: "paul_250914"
+  resolution_Hz: 60
+  npx: true
+  imec: 1
+
+paul_250914_plx:
+  experiment_name: "paul_20250914"
+  resolution_Hz: 60
+  npx: false 
+  imec: 0
+
+
