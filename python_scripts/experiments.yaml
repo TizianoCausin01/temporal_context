@@ -1,0 +1,5 @@
+paul_250914_npx0:
+  experiment_name: "paul_250914"
+  resolution_Hz: 60
+  npx: true
+  imec: 0

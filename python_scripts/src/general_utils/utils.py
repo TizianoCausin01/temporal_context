@@ -1,5 +1,8 @@
 from datetime import datetime
 import numpy as np
+import argparse
+import yaml
+
 def print_wise(mex, rank=None):
     if rank == None:
         print(datetime.now().strftime("%H:%M:%S"), f"- {mex}", flush=True)
@@ -108,3 +111,20 @@ def make_intervals(total: int, n: int):
         intervals.append((start, p))
         start = start+p
     return intervals
+
+
+def get_experiment_parameters():
+    with open("../experiments.yaml", "r") as f: # loads the yaml file with the experiment parameters
+        experiments = yaml.safe_load(f)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--analyses_name", type=str) # receives the input name
+    args = parser.parse_args()
+    experiment_parameters = experiments[args.analyses_name]
+    experiment_parameters['analyses_name'] = args.analyses_name
+    return experiment_parameters
+# EOF
+
+def update_experiments_log(experiment_name):
+    with open("../experiments_log.txt", "a") as f:
+        f.write(f"\n{datetime.now().strftime("%H:%M:%S")} - {experiment_name}")
+# EOF
