@@ -14,10 +14,15 @@ sys.path.append(paths["src_path"])
 from data_preprocessing.preprocessing import format_in_trials
 from general_utils.utils import print_wise
 
-exp_name = "paul_250914" # put it as an input (the date is monkeyName_2025.... for Plx; and monkeyName_25.... for Npx)
-res_Hz = 30  # put it as an input
-npx = True # put it as an input
-imec_n = 0 # put it as an input
+
+with open("../experiments.yaml", "r") as f:
+    experiment = yaml.safe_load(f)
+parser = argparse.ArgumentParser()
+parser.add_argument("--experiment_name", type=str)
+args = parser.parse_args()
+
+with open("../experiments_log.txt", "a") as f:
+    f.write("\nThis is a new line at the bottom")
 data_path = f"{paths['data_formatted']}/{exp_name}_experiment.mat"
 d = loadmat(data_path)
 trials = d["Trials"]
