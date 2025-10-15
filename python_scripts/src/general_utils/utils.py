@@ -126,5 +126,5 @@ def get_experiment_parameters():
 
 def update_experiments_log(experiment_name):
     with open("../experiments_log.txt", "a") as f:
-        f.write(f"\n{datetime.now().strftime("%H:%M:%S")} - {experiment_name}")
+        f.write(f"\n{datetime.now().strftime('%H:%M:%S')} - {experiment_name}")
 # EOF
