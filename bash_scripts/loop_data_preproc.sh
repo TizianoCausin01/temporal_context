@@ -1,18 +1,16 @@
-monkey_names=(venus paul baby1 louie red)
-dates=(19 20 21 22 23 24)
-loc_path=/n/files/Neurobio/LivingstoneLab/Data/Data-Neuropixels-Preprocessed
-loc_path_plx=/n/files/Neurobio/LivingstoneLab/Data/Data-Formatted
-cluster_path=/n/data2/hms/neurobio/livingstone/Data/Npx-Preprocessed
-cluster_path_plx=/n/data2/hms/neurobio/livingstone/Data/Formatted
+#!/bin/bash
 
-for name in ${monkey_names[@]}; do
-    for day in ${dates[@]}; do
-        if [[ "$name" = "paul" ]]; then
-            cp ${loc_path_plx}/${name}_202509${day}-rasters.h5 tic569@o2.hms.harvard.edu:${cluster_path_plx}/${name}_202509${day}-rasters.h5 #_plx
-        fi            
-        cp -r ${loc_path}/${name}_2509${day} tic569@o2.hms.harvard.edu:${cluster_path}/${name}_2509${day}         
-        cp ${loc_path_plx}/${name}_202509${day}_experiment.mat tic569@o2.hms.harvard.edu:${cluster_path_plx}/${name}_202509${day}_experiment.mat #_plx
-        done
-    done
-done
-
+#SBATCH --nodes=1
+#SBATCH --time=1:30:00
+#SBATCH --ntasks=1 # number of processes
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=30G
+#SBATCH --account=livingstone       # account name
+#SBATCH --partition=short # partition name
+#SBATCH --job-name=preprocesing1
+#SBATCH --output=/home/tic569/output_jobs/%x.%j.out   # file name will be *job_name*.*job_id*
+cd /home/tic569/temporal_context/python_scripts/scripts
+module load gcc/14.2.0
+module load python/3.13.1
+source ~/virtual_envs/temporal_context/bin/activate
+python3 loop_load_and_save_data.py --analyses_name preprocessing1

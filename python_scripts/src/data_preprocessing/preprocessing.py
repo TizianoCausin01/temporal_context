@@ -1,6 +1,9 @@
 import sys, os
 import numpy as np
 import copy
+import h5py
+import pickle
+from scipy.io import loadmat
 sys.path.append("..")
 from general_utils.utils import print_wise
 
@@ -62,7 +65,8 @@ OUTPUT:
 """
 def create_bins(trial_duration, len_avg_window):
     bins = np.round(np.arange(0, trial_duration, len_avg_window)).astype(int)  # bins the target trial with the required resolution, convert to int for later indexing
-    bins = np.append(bins, int(trial_duration))  # adds the last time bin
+    if bins[-1] != trial_duration:
+        bins = np.append(bins, int(trial_duration))  # adds the last time bin
     return bins
 # EOF
 
@@ -108,14 +112,19 @@ def cut_excess_timepoints(data_dict):
     # end if type(data_dict[dict_keys[0]]) != list:
     for key in dict_keys:
         len_timepts_list = [data_dict[key][i].shape[1] for i in range(len(data_dict[key]))]
-        min_time_pts = min(len_timepts_list)
-        if len(set(len_timepts_list)) != 1:   
-            print_wise(f"Warning! {key} has different time-points across trials {len_timepts_list}")
-        # end if len(set(len_timepts_list)) != 1:   
-        for i_rep in range(len(data_dict[key])): # loops_through the repetitions of the video within the day
-            data_dict[key][i_rep] = data_dict[key][i_rep][:, :min_time_pts]
-        # end for i in range(len(data_dict[key])):
-        data_dict[key] = np.stack(data_dict[key], axis=2)
+        if len(len_timepts_list) > 0:
+            min_time_pts = min(len_timepts_list)
+            if len(set(len_timepts_list)) != 1:   
+                print_wise(f"Warning! {key} has different time-points across trials {len_timepts_list}")
+            # end if len(set(len_timepts_list)) != 1:   
+            for i_rep in range(len(data_dict[key])): # loops_through the repetitions of the video within the day
+                data_dict[key][i_rep] = data_dict[key][i_rep][:, :min_time_pts]
+            # end for i in range(len(data_dict[key])):
+            data_dict[key] = np.stack(data_dict[key], axis=2)
+        else:
+            print_wise(f"Warning, {key} doesn't have any successful trial")
+            data_dict[key] = np.array([])
+        # end if len(len_timepts_list) > 0:
     # end for key in data_dict.keys():
     return data_dict
 # EOF
@@ -155,9 +164,10 @@ def wrapper_load_and_save(paths, experiment_name, imec, resolution_Hz, npx=True)
     d = loadmat(data_path)
     trials = d["Trials"]
     stimuli = d["Stimuli"]
-    print_wise("Start loading rasters...")
+    print_wise(f"Start loading rasters of {experiment_name}...")
     if npx == False:
-        rasters_path = f"{paths['data_formatted']}/{experiment_name}-rasters.h5"
+        exp_name_plx = experiment_name[:5] + "20" + experiment_name[5:] # because plx saves files with 2025 instead of 25
+        rasters_path = f"{paths['data_formatted']}/{exp_name_plx}-rasters.h5"
         with h5py.File(rasters_path, "r") as f:
             rasters = f["rasters"][:]
     elif npx == True:
@@ -169,11 +179,12 @@ def wrapper_load_and_save(paths, experiment_name, imec, resolution_Hz, npx=True)
 
     s = np.concatenate(stimuli["filename"])
     file_list = [str(x[0]) for x in s]
-    len_window_firing_rate = 1000/parms['resolution_Hz']
+    len_window_firing_rate = 1000/resolution_Hz
     neural, gaze = format_in_trials(file_list, len_window_firing_rate, rasters, trials, stimuli)
 
     with open(neural_out_fn, "wb") as f:
         pickle.dump(neural, f)
+        print_wise(f"file saved at {neural_out_fn}")
     with open(gaze_out_fn, "wb") as f:
         pickle.dump(gaze, f)
 # EOF
