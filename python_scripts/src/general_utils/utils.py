@@ -48,13 +48,13 @@ OUTPUT:
     - corr_mat: np.ndarray(float) -> (tpts x tpts) the matrix of cross-correlation
 """
 def autocorr_mat(data, data2=None):
-    if data2 == None:
+    if data2 is None:
         corr_mat = np.corrcoef(data, rowvar=False)
     else:
         d1_shape = data.shape
         d2_shape = data2.shape
         corr_mat = np.corrcoef(data, data2, rowvar=False) # in the future I'll create a corr function with numba
-        corr_mat = corr_mat[:d1_shape[1], d1_shape[1]:]
+        corr_mat = corr_mat[:d1_shape[1], d2_shape[1]:]
     return corr_mat
 # EOF
 
