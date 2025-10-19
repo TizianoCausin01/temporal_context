@@ -161,12 +161,18 @@ def wrapper_load_and_save(paths, experiment_name, imec, resolution_Hz, npx=True)
     # end if os.path.exists(neural_out_fn) & os.path.exists(gaze_out_fn):
 
     data_path = f"{paths['data_formatted']}/{experiment_name}_experiment.mat"
+    if "red" in experiment_name: # red is saved differently also in the experiment.mat file
+        exp_name_plx = experiment_name[:4] + "20" + experiment_name[4:]
+        data_path = f"{paths['data_formatted']}/{exp_name_plx}_experiment.mat"
     d = loadmat(data_path)
     trials = d["Trials"]
     stimuli = d["Stimuli"]
     print_wise(f"Start loading rasters of {experiment_name}...")
     if npx == False:
-        exp_name_plx = experiment_name[:5] + "20" + experiment_name[5:] # because plx saves files with 2025 instead of 25
+        if "paul" in experiment_name:
+            exp_name_plx = experiment_name[:5] + "20" + experiment_name[5:] # because plx saves files with 2025 instead of 25
+        elif "red" in experiment_name:
+            pass # we have already defined exp_name_plx
         rasters_path = f"{paths['data_formatted']}/{exp_name_plx}-rasters.h5"
         with h5py.File(rasters_path, "r") as f:
             rasters = f["rasters"][:]
