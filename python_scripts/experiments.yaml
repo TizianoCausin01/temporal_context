@@ -4,74 +4,6 @@ paul_250914_npx0:
   npx: true
   imec: 0
 
-paul_250914_npx1:
-  experiment_name: "paul_250914"
-  resolution_Hz: 60
-  npx: true
-  imec: 1
-
-paul_250914_plx:
-  experiment_name: "paul_20250914"
-  resolution_Hz: 60
-  npx: false 
-  imec: 0
-
- 
-paul_250914_npx0:
-  experiment_name: "paul_250914"
-  resolution_Hz: 60
-  npx: true
-  imec: 0
-
-paul_250914_npx1:
-  experiment_name: "paul_250914"
-  resolution_Hz: 60
-  npx: true
-  imec: 1
-
-paul_250914_plx:
-  experiment_name: "paul_20250914"
-  resolution_Hz: 60
-  npx: false 
-  imec: 0
-
-
-paul_250914_npx0:
-  experiment_name: "paul_250914"
-  resolution_Hz: 60
-  npx: true
-  imec: 0
-
-paul_250914_npx1:
-  experiment_name: "paul_250914"
-  resolution_Hz: 60
-  npx: true
-  imec: 1
-
-paul_250914_plx:
-  experiment_name: "paul_20250914"
-  resolution_Hz: 60
-  npx: false 
-  imec: 0
-
-
-paul_250914_npx0:
-  experiment_name: "paul_250914"
-  resolution_Hz: 60
-  npx: true
-  imec: 0
-
-paul_250914_npx1:
-  experiment_name: "paul_250914"
-  resolution_Hz: 60
-  npx: true
-  imec: 1
-
-paul_250914_plx:
-  experiment_name: "paul_20250914"
-  resolution_Hz: 60
-  npx: false 
-  imec: 0
 
 preprocessing1:
   experiment_name: "preprocessing1"
@@ -81,6 +13,51 @@ preprocessing1:
     - baby1
     - louie
   dates:
+    - 0919
+    - 0920
+    - 0921
+    - 0922
+    - 0923
+    - 0924
+  resolution_Hz: 60
+
+preprocessing2:
+  experiment_name: "preprocessing2"
+  monkey_names:
+    - red
+  dates:
+    - 0818
+    - 0819
+    - 0820
+    - 0821
+    - 0822
+    - 0823
+    - 0824
+    - 0825
+    - 0826
+    #- 0827 # doesn't have stimuli names
+    - 0828
+    #- 0829 # doesn't have rasters file
+    - 0830
+    - 0831
+    - 0901
+    - 0902
+    - 0903
+    - 0904
+    - 0905
+    - 0906
+    - 0907
+    - 0908
+    #- 0909
+    #- 0910 # images were presented on this day
+    - 0911
+    - 0912
+    - 0913
+    - 0914 
+    - 0915
+    - 0916
+    - 0917
+    - 0918
     - 0919
     - 0920
     - 0921
