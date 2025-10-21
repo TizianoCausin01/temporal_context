@@ -3,6 +3,7 @@ import numpy as np
 import copy
 import h5py
 import pickle
+import cv2
 from scipy.io import loadmat
 sys.path.append("..")
 from general_utils.utils import print_wise
@@ -10,7 +11,8 @@ from general_utils.utils import print_wise
 """
 format_in_trials
 From the raster, stimuli and trials objects, it gives two dicts (neural and gaze dicts) with the formatted trials.
-INPUT:
+INPUT: 
+    - paths: dict{str, str} -> the dict specified in the config.yaml file
     - file_list: list{str} -> a list with all the stimulus names
     - len_avg_window: np.float -> how much we want to average out our 1000Hz neural and eye-tracking signals
     - rasters: np.ndarray (timepts x channels) -> the whole experiment neural signal 
@@ -19,28 +21,26 @@ INPUT:
 OUTPUT:
     - final_res_neural, final_res_gaze: dict{str, np.ndarray{3D}} -> dictionaries with the stimuli names as keys and 3D np.ndarrays (channels x timepts x trials)  
 """
-def format_in_trials(file_list, len_avg_window, rasters, trials, stimuli):
+def format_in_trials(paths, file_list, len_avg_window, rasters, trials, stimuli):
     unique_stimuli_names = set(file_list)
     final_res_neural = {name : [] for name in unique_stimuli_names}
     final_res_gaze = copy.deepcopy(final_res_neural)
 
     # correctly estimates trials durations
     for idx, fn in enumerate(file_list):  # range(len(stimuli)): 
-        # print(stimuli[idx]["trial_number"],stimuli[idx]["trial_number"].shape)
         trial_number = (int(stimuli[idx]["trial_number"][0].item()) - 1)  # extracts the trial number to which the stimulus corresponds (-1 because of python indexing)
         
         if trials[trial_number]["success"] == 1 and stimuli[idx]["filename"] == fn:
             trial_start = stimuli[idx]["start_time"][0].item()
             trial_end = stimuli[idx]["stop_time"][0].item()
             trial_duration = trial_end - trial_start
-            #print(fn, trial_duration)
             stim_onset_delay = trial_start - trials[trial_number]["start_time"][0].item()
-            stim_onset_delay = int(stim_onset_delay) - 1  # -1 for python indexing
+            stim_onset_delay = round(stim_onset_delay) - 1  # -1 for python indexing
             gaze_signal = trials[trial_number]["eye_data"][0]
-            end_gaze = min(stim_onset_delay + int(trial_duration), len(gaze_signal))
+            end_gaze = min(stim_onset_delay + round(trial_duration), len(gaze_signal))
             gaze_signal = gaze_signal[stim_onset_delay:end_gaze, :].T # extracts gaze from the stimulus onset till the end of the trial
-            trial_start_int = int(trial_start)
-            trial_end_int = int(trial_end)
+            trial_start_int = round(trial_start)
+            trial_end_int = round(trial_end)
             bins = create_bins(trial_duration, len_avg_window)
             neural_signal = rasters[trial_start_int:trial_end_int, :].T  # slices the trial from raster
             trial_firing_rate = get_firing_rate(bins, neural_signal)
@@ -52,6 +52,7 @@ def format_in_trials(file_list, len_avg_window, rasters, trials, stimuli):
     # end for i in range(len(stimuli)):
     final_res_neural = cut_excess_timepoints(final_res_neural)
     final_res_gaze = cut_excess_timepoints(final_res_gaze)
+    final_res_neural, final_res_gaze = cut_short_movies(paths, final_res_neural, final_res_gaze, len_avg_window)
     return final_res_neural, final_res_gaze
 
 """
@@ -146,6 +147,74 @@ def convert_gaze_coordinates(gaze):
     return gaze 
 # EOF
 
+
+"""
+movie_paths
+Gets the right folder of the movies of that experiment
+INPUT: 
+    - paths: dict{str, str} -> the dict specified in the config.yaml file
+    - stimuli_names: list -> the list with the stimuli that were presented
+OUTPUT:
+    - movies_folder: str -> the folder were the movies are
+"""
+def movie_paths(paths, stimuli_names):
+    stimuli_folder = f"{paths['livingstone_lab']}/Stimuli/movies"
+    if "IMG_4692.mp4" in stimuli_names:
+        return f"{stimuli_folder}/peoplePPE"
+    elif "IMG_4655.mp4" in stimuli_names:
+        return f"{stimuli_folder}/cagemonkeys"
+    elif "YDXJ0085.MP4" in stimuli_names:
+        return f"{stimuli_folder}/occluded_videos"
+    elif "anna1_10s.mp4" in stimuli_names:
+        return f"{stimuli_folder}/faceswap_4"
+    elif "steve1.mp4" in stimuli_names:
+        return f"{stimuli_folder}/faceswap_5"
+    else:
+        print_wise(f"I couldn't find the right path for these stimuli {stimuli_names}")
+
+
+"""
+get_video_duration_fps
+Extracts metadata from the movie (in order to account for movies that were shorter than the trial duration)
+INPUT:
+    - video_path: str -> the path to the video
+OUTPUT:
+    - fps: np.float -> the framerate of the video
+    - duration: np.float -> the duration of the video in ms
+"""
+def get_video_duration_fps(video_path):
+    cap = cv2.VideoCapture(video_path)
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    frame_count = round(cap.get(cv2.CAP_PROP_FRAME_COUNT))        
+    duration = frame_count *1000 / fps # in ms, that's why we multiply by 1000
+    cap.release()
+    return np.round(fps, 2), duration
+
+
+"""
+cut_short_movies 
+Cuts the excess datapoints in a dict, it's there to account for the fact that some movies were much less than 10s.
+INPUT:
+    - paths: dict{str, str} -> the dict specified in the config.yaml file
+    - neural_dict: dict{str, np.ndarray} -> the neural dict with the trials names and data
+    - gaze_dict: dict{str, np.ndarray} -> the gaze dict with the trials names and data
+    - len_avg_window: int -> 1000/resolution_Hz, i.e. the length in ms of the window within which we average
+OUTPUT:
+    - data_dict: dict{str, np.ndarray} -> the dict with the trials names and data, can be both gaze and neural with the datapoints cut now
+"""
+def cut_short_movies(paths, neural_dict, gaze_dict, len_avg_window):
+    stimuli_names = list(neural_dict.keys())
+    movies_folder = movie_paths(paths, stimuli_names)
+    for fn in stimuli_names:
+        fps, vid_duration = get_video_duration_fps(f"{movies_folder}/{fn}")
+        vid_duration = round(vid_duration / len_avg_window)
+        if vid_duration < neural_dict[fn].shape[1]:
+            neural_dict[fn] = neural_dict[fn][:,:vid_duration, :]
+        if vid_duration < gaze_dict[fn].shape[1]:
+            gaze_dict[fn] = gaze_dict[fn][:,:vid_duration, :]
+    return neural_dict, gaze_dict
+
+
 def wrapper_load_and_save(paths, experiment_name, imec, resolution_Hz, npx=True):
     if npx == True:
         neural_out_fn=f"{paths['livingstone_lab']}/tiziano/data/neural_{experiment_name}_imec{imec}_{resolution_Hz}Hz.pkl"
@@ -186,7 +255,7 @@ def wrapper_load_and_save(paths, experiment_name, imec, resolution_Hz, npx=True)
     s = np.concatenate(stimuli["filename"])
     file_list = [str(x[0]) for x in s]
     len_window_firing_rate = 1000/resolution_Hz
-    neural, gaze = format_in_trials(file_list, len_window_firing_rate, rasters, trials, stimuli)
+    neural, gaze = format_in_trials(paths, file_list, len_window_firing_rate, rasters, trials, stimuli)
 
     with open(neural_out_fn, "wb") as f:
         pickle.dump(neural, f)
