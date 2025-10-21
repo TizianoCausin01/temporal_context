@@ -46,6 +46,7 @@ def format_in_trials(paths, file_list, len_avg_window, rasters, trials, stimuli)
             trial_firing_rate = get_firing_rate(bins, neural_signal)
             trial_gaze = get_firing_rate(bins, gaze_signal)
             trial_gaze = convert_gaze_coordinates(trial_gaze)
+            trial_gaze = append_fixations(trial_gaze, trial_number, trials, len_avg_window, stim_onset_delay)
             final_res_neural[fn].append(trial_firing_rate)
             final_res_gaze[fn].append(trial_gaze)
         # if trials[trial_number]["success"] == 1 and stimuli[idx]["filename"] == fn:
@@ -60,7 +61,7 @@ create_bins
 Creates the bins for computing the firing rate by defining a range with a certain step and converting to int (because we assume the resolution of the signal is at 1000Hz.
 INPUT:
     - trial_duration: int -> the duration of the trial
-    - len_avg_window: np.float -> the length of the window
+    - len_avg_window: np.float -> how much we want to average out our 1000Hz neural and eye-tracking signals
 OUTPUT:
     - bins: np.ndarray -> the onsets of each bin to average in get_firing_rate
 """
@@ -206,14 +207,45 @@ def cut_short_movies(paths, neural_dict, gaze_dict, len_avg_window):
     stimuli_names = list(neural_dict.keys())
     movies_folder = movie_paths(paths, stimuli_names)
     for fn in stimuli_names:
-        fps, vid_duration = get_video_duration_fps(f"{movies_folder}/{fn}")
-        vid_duration = round(vid_duration / len_avg_window)
-        if vid_duration < neural_dict[fn].shape[1]:
-            neural_dict[fn] = neural_dict[fn][:,:vid_duration, :]
-        if vid_duration < gaze_dict[fn].shape[1]:
-            gaze_dict[fn] = gaze_dict[fn][:,:vid_duration, :]
+        if neural_dict[fn].size: 
+            fps, vid_duration = get_video_duration_fps(f"{movies_folder}/{fn}")
+            vid_duration = round(vid_duration / len_avg_window)
+            if vid_duration < neural_dict[fn].shape[1]:
+                neural_dict[fn] = neural_dict[fn][:,:vid_duration, :]
+            if vid_duration < gaze_dict[fn].shape[1]:
+                gaze_dict[fn] = gaze_dict[fn][:,:vid_duration, :]
     return neural_dict, gaze_dict
 
+
+"""
+append_fixations
+Appends the aligned fixation times as the third (and binary) row to trial_gaze
+INPUT:
+    - trial_gaze: np.ndarray -> 2 x trial_duration, gaze data for the current trial 
+    - trial_number: int -> the number of the trial
+    - trials -> the trials file
+    - len_avg_window: np.float -> how much we want to average out our 1000Hz neural and eye-tracking signals
+    - stim_onset_delay: int -> the delay between the start of the trial and the start of the stimulus presentation
+OUTPUT:
+    - trial_gaze_fixations: np.ndarray -> 3 x trial_duration, gaze data for the current trial with the fixations in the third row
+"""
+def append_fixations(trial_gaze, trial_number, trials, len_avg_window, stim_onset_delay):
+    gaze_len = trial_gaze.shape[1]
+    fixation_times = trials[trial_number]["fixation_times"]
+    fixation_times_delay = fixation_times[0].astype(int) - stim_onset_delay - 1 # -1 for python indexing, the other for the fact that we are subtracting 1 to stimulus_duration
+    downsampled_fixation_times = np.round(fixation_times_delay/len_avg_window).astype(int)
+    fixation_mask = (downsampled_fixation_times >= 0) & (downsampled_fixation_times <= gaze_len)
+    fixation_masked = downsampled_fixation_times[np.any(fixation_mask, axis=1)]
+    fixation_masked = fixation_masked 
+    if fixation_masked[0,0] < 0:
+        fixation_masked[0,0] = 0
+    if fixation_masked[-1, 1] >= gaze_len:
+        fixation_masked[-1, 1] = gaze_len -1
+    fixation_binary = np.zeros(gaze_len)
+    for onset, offset in fixation_masked:
+        fixation_binary[onset:offset] = 1  
+    trial_gaze_fixations = np.concatenate((trial_gaze, fixation_binary[np.newaxis,:]), axis=0)      
+    return trial_gaze_fixations
 
 def wrapper_load_and_save(paths, experiment_name, imec, resolution_Hz, npx=True):
     if npx == True:
