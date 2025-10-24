@@ -21,7 +21,7 @@ INPUT:
 OUTPUT:
     - final_res_neural, final_res_gaze: dict{str, np.ndarray{3D}} -> dictionaries with the stimuli names as keys and 3D np.ndarrays (channels x timepts x trials)  
 """
-def format_in_trials(paths, file_list, len_avg_window, rasters, trials, stimuli):
+def format_in_trials(paths, file_list, len_avg_window, foreperiod_len, rasters, trials, stimuli):
     unique_stimuli_names = set(file_list)
     final_res_neural = {name : [] for name in unique_stimuli_names}
     final_res_gaze = copy.deepcopy(final_res_neural)
@@ -38,22 +38,22 @@ def format_in_trials(paths, file_list, len_avg_window, rasters, trials, stimuli)
             stim_onset_delay = round(stim_onset_delay) - 1  # -1 for python indexing
             gaze_signal = trials[trial_number]["eye_data"][0]
             end_gaze = min(stim_onset_delay + round(trial_duration), len(gaze_signal))
-            gaze_signal = gaze_signal[stim_onset_delay:end_gaze, :].T # extracts gaze from the stimulus onset till the end of the trial
+            gaze_signal = gaze_signal[stim_onset_delay - foreperiod_len :end_gaze, :].T # extracts gaze from the stimulus onset till the end of the trial
             trial_start_int = round(trial_start)
             trial_end_int = round(trial_end)
-            bins = create_bins(trial_duration, len_avg_window)
-            neural_signal = rasters[trial_start_int:trial_end_int, :].T  # slices the trial from raster
+            bins = create_bins(trial_duration + foreperiod_len, len_avg_window)
+            neural_signal = rasters[trial_start_int - foreperiod_len:trial_end_int, :].T  # slices the trial from raster
             trial_firing_rate = get_firing_rate(bins, neural_signal)
             trial_gaze = get_firing_rate(bins, gaze_signal)
             trial_gaze = convert_gaze_coordinates(trial_gaze)
-            trial_gaze = append_fixations(trial_gaze, trial_number, trials, len_avg_window, stim_onset_delay)
+            trial_gaze = append_fixations(trial_gaze, trial_number, trials, len_avg_window, stim_onset_delay, foreperiod_len)
             final_res_neural[fn].append(trial_firing_rate)
             final_res_gaze[fn].append(trial_gaze)
         # if trials[trial_number]["success"] == 1 and stimuli[idx]["filename"] == fn:
     # end for i in range(len(stimuli)):
     final_res_neural = cut_excess_timepoints(final_res_neural)
     final_res_gaze = cut_excess_timepoints(final_res_gaze)
-    final_res_neural, final_res_gaze = cut_short_movies(paths, final_res_neural, final_res_gaze, len_avg_window)
+    final_res_neural, final_res_gaze = cut_short_movies(paths, final_res_neural, final_res_gaze, len_avg_window, foreperiod_len)
     return final_res_neural, final_res_gaze
 
 """
@@ -160,18 +160,15 @@ OUTPUT:
 """
 def movie_paths(paths, stimuli_names):
     stimuli_folder = f"{paths['livingstone_lab']}/Stimuli/movies"
-    if "IMG_4692.mp4" in stimuli_names:
-        return f"{stimuli_folder}/peoplePPE"
-    elif "IMG_4655.mp4" in stimuli_names:
-        return f"{stimuli_folder}/cagemonkeys"
-    elif "YDXJ0085.MP4" in stimuli_names:
-        return f"{stimuli_folder}/occluded_videos"
-    elif "anna1_10s.mp4" in stimuli_names:
-        return f"{stimuli_folder}/faceswap_4"
-    elif "steve1.mp4" in stimuli_names:
-        return f"{stimuli_folder}/faceswap_5"
-    else:
-        print_wise(f"I couldn't find the right path for these stimuli {stimuli_names}")
+    possible_folders = ['peoplePPE', 'cagemonkeys', 'occluded_videos', 'shortOccluded', 'all_faceswaps'] 
+    for folder in possible_folders:
+        folder_files = os.listdir(f"{stimuli_folder}/{folder}")
+        if any(el in stimuli_names for el in folder_files): # checks for a possible file present in both lists
+            return f"{stimuli_folder}/{folder}"
+        # end if any(el in stimuli_names for el in folder_files):
+    # end for folder in possible_folders:
+    print_wise(f"I couldn't find the right path for these stimuli {stimuli_names}")
+# EOF
 
 
 """
@@ -203,17 +200,18 @@ INPUT:
 OUTPUT:
     - data_dict: dict{str, np.ndarray} -> the dict with the trials names and data, can be both gaze and neural with the datapoints cut now
 """
-def cut_short_movies(paths, neural_dict, gaze_dict, len_avg_window):
+def cut_short_movies(paths, neural_dict, gaze_dict, len_avg_window, foreperiod_len):
     stimuli_names = list(neural_dict.keys())
+    foreperiod_len_timepts = round(foreperiod_len / len_avg_window)
     movies_folder = movie_paths(paths, stimuli_names)
     for fn in stimuli_names:
         if neural_dict[fn].size: 
             fps, vid_duration = get_video_duration_fps(f"{movies_folder}/{fn}")
             vid_duration = round(vid_duration / len_avg_window)
-            if vid_duration < neural_dict[fn].shape[1]:
-                neural_dict[fn] = neural_dict[fn][:,:vid_duration, :]
-            if vid_duration < gaze_dict[fn].shape[1]:
-                gaze_dict[fn] = gaze_dict[fn][:,:vid_duration, :]
+            if vid_duration + foreperiod_len_timepts < neural_dict[fn].shape[1]:
+                neural_dict[fn] = neural_dict[fn][:,:vid_duration + foreperiod_len_timepts, :]
+            if vid_duration + foreperiod_len_timepts< gaze_dict[fn].shape[1]:
+                gaze_dict[fn] = gaze_dict[fn][:,:vid_duration + foreperiod_len_timepts, :]
     return neural_dict, gaze_dict
 
 
@@ -229,25 +227,27 @@ INPUT:
 OUTPUT:
     - trial_gaze_fixations: np.ndarray -> 3 x trial_duration, gaze data for the current trial with the fixations in the third row
 """
-def append_fixations(trial_gaze, trial_number, trials, len_avg_window, stim_onset_delay):
+def append_fixations(trial_gaze, trial_number, trials, len_avg_window, stim_onset_delay, foreperiod_len):
     gaze_len = trial_gaze.shape[1]
     fixation_times = trials[trial_number]["fixation_times"]
-    fixation_times_delay = fixation_times[0].astype(int) - stim_onset_delay - 1 # -1 for python indexing, the other for the fact that we are subtracting 1 to stimulus_duration
+    fixation_times_delay = fixation_times[0].astype(int) - stim_onset_delay + foreperiod_len - 1 # -1 for python indexing, the other for the fact that we are subtracting 1 to stimulus_duration
     downsampled_fixation_times = np.round(fixation_times_delay/len_avg_window).astype(int)
     fixation_mask = (downsampled_fixation_times >= 0) & (downsampled_fixation_times <= gaze_len)
     fixation_masked = downsampled_fixation_times[np.any(fixation_mask, axis=1)]
-    fixation_masked = fixation_masked 
-    if fixation_masked[0,0] < 0:
-        fixation_masked[0,0] = 0
-    if fixation_masked[-1, 1] >= gaze_len:
-        fixation_masked[-1, 1] = gaze_len -1
+    if fixation_masked.shape[0]!=0:
+        if fixation_masked[0,0] < 0:
+            fixation_masked[0,0] = 0
+        if fixation_masked[-1, 1] >= gaze_len:
+            fixation_masked[-1, 1] = gaze_len -1
+    else:
+        print_wise(f"Warning! - Trial {trial_number} doesn't have any fixation")
     fixation_binary = np.zeros(gaze_len)
     for onset, offset in fixation_masked:
         fixation_binary[onset:offset] = 1  
     trial_gaze_fixations = np.concatenate((trial_gaze, fixation_binary[np.newaxis,:]), axis=0)      
     return trial_gaze_fixations
 
-def wrapper_load_and_save(paths, experiment_name, imec, resolution_Hz, npx=True):
+def wrapper_load_and_save(paths, experiment_name, imec, resolution_Hz, foreperiod_len, npx=True):
     if npx == True:
         neural_out_fn=f"{paths['livingstone_lab']}/tiziano/data/neural_{experiment_name}_imec{imec}_{resolution_Hz}Hz.pkl"
         gaze_out_fn=f"{paths['livingstone_lab']}/tiziano/data/gaze_{experiment_name}_imec{imec}_{resolution_Hz}Hz.pkl"
@@ -287,7 +287,7 @@ def wrapper_load_and_save(paths, experiment_name, imec, resolution_Hz, npx=True)
     s = np.concatenate(stimuli["filename"])
     file_list = [str(x[0]) for x in s]
     len_window_firing_rate = 1000/resolution_Hz
-    neural, gaze = format_in_trials(paths, file_list, len_window_firing_rate, rasters, trials, stimuli)
+    neural, gaze = format_in_trials(paths, file_list, len_window_firing_rate, foreperiod_len, rasters, trials, stimuli)
 
     with open(neural_out_fn, "wb") as f:
         pickle.dump(neural, f)
