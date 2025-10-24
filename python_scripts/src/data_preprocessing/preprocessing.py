@@ -203,7 +203,8 @@ OUTPUT:
 def cut_short_movies(paths, neural_dict, gaze_dict, len_avg_window, foreperiod_len):
     stimuli_names = list(neural_dict.keys())
     foreperiod_len_timepts = round(foreperiod_len / len_avg_window)
-    movies_folder = movie_paths(paths, stimuli_names)
+    #movies_folder = movie_paths(paths, stimuli_names)
+    movies_folder = f"{paths['livingstone_lab']}/Stimuli/Movies/all_videos" # movie_paths(paths, stimuli_names)
     for fn in stimuli_names:
         if neural_dict[fn].size: 
             fps, vid_duration = get_video_duration_fps(f"{movies_folder}/{fn}")
