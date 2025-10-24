@@ -181,6 +181,7 @@ OUTPUT:
     - duration: np.float -> the duration of the video in ms
 """
 def get_video_duration_fps(video_path):
+    print(video_path)
     cap = cv2.VideoCapture(video_path)
     fps = cap.get(cv2.CAP_PROP_FPS)
     frame_count = round(cap.get(cv2.CAP_PROP_FRAME_COUNT))        
