@@ -48,7 +48,7 @@ def split_parallel(n_tasks, func_work, args_work, paths, rec_back=False, func_me
 # EOF
 
 
-def master_workers_queue(task_list, func, *args, **kwargs):
+def master_workers_queue(task_list, paths, func, *args, **kwargs):
     comm, rank, size = parallel_setup()
     root = 0
     tot_n = len(task_list)
@@ -59,12 +59,12 @@ def master_workers_queue(task_list, func, *args, **kwargs):
                 np.int32(next_to_do), dest=dst, tag=11
             )  # Send data to process with rank 1
             next_to_do += 1
-            print_wise(f"computed {next_to_do}", rank=rank)
+            print_wise(f"sent {next_to_do} to {dst}", rank=rank)
             if next_to_do == tot_n:
                 break
             # end if done_by_now+1 > tot_n:
-
-        # spotlight = np.zeros(size - 1)  # one means the process is free
+        # end for dst in range(1, size):
+        
         while next_to_do < tot_n:
             status = MPI.Status()
             d = comm.recv(source=MPI.ANY_SOURCE, tag=MPI.ANY_TAG, status=status)
@@ -74,9 +74,13 @@ def master_workers_queue(task_list, func, *args, **kwargs):
                 np.int32(next_to_do), dest=src, tag=11
             )  # Send data to process with rank 1
             next_to_do += 1
-            print_wise(f"received from {src} , root : {next_to_do}", rank=rank)
+            print_wise(f"{src} is free again, root sent : {next_to_do}", rank=rank)
+        # end while next_to_do < tot_n:
+
+        print_wise(f"Sending termination signals", rank=rank)
         for i in range(1, size):
             comm.send(np.int32(-1), dest=i, tag=11)  # Send data to process with rank 1
+        # end for i in range(1, size):
 
     else:
         while True:
@@ -84,14 +88,16 @@ def master_workers_queue(task_list, func, *args, **kwargs):
             print_wise(f"received: {data}", rank=rank)
             if data == np.int32(-1):
                 break
-            func(rank, task_list[data], *args)
+            func(paths, rank, task_list[data], *args, **kwargs)
             comm.send(
                 np.int32(1), dest=root, tag=11
             )  # Send data to process with rank 1
-            print_wise(f"free again", rank=rank)
+        # end while True:
+    # end if rank == 0:
 
     print_wise("finished", rank=rank)
     MPI.Finalize()
+#EOF
 
 
 
