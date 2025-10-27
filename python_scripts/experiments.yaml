@@ -55,7 +55,7 @@ preprocessing2:
     - 0913
     - 0914 
     - 0915
-    - 0916
+    # - 0916
     - 0917
     - 0918
     - 0919
@@ -88,7 +88,7 @@ preprocessing_red_100Hz:
     - 0901
     - 0902
     - 0903
-    - 0904
+    # - 0904 # missing experiments.mat file
     - 0905
     - 0906
     - 0907
@@ -100,9 +100,25 @@ preprocessing_red_100Hz:
     - 0913
     - 0914 
     - 0915
-    - 0916
+    - 0916 
     - 0917
     - 0918
+    - 0919
+    - 0920
+    - 0921
+    - 0922
+    - 0923
+    - 0924
+  resolution_Hz: 100
+
+preprocessing_all_100Hz:
+  experiment_name: "preprocessing_all_100Hz"
+  monkey_names:
+    - venus
+    - paul
+    - baby1
+    - louie
+  dates:
     - 0919
     - 0920
     - 0921
