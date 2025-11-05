@@ -1,6 +1,11 @@
 import os, yaml, sys
 import numpy as np
 
+
+"""
+make_corners
+For plotting the coords on a picture
+"""
 def make_corners(x1, y1, x2, y2):
     points = np.array([
         [x1, y1],  # top-left
@@ -11,16 +16,32 @@ def make_corners(x1, y1, x2, y2):
     ])
     return points
 
+
+"""
+get_height_width
+To get the height and width of a box
+"""
 def get_height_width(x1, y1, x2, y2):
     w = x2 - x1
     h = y2 - y1
     return h, w
 
+
+"""
+compute_center
+To compute the center of a box
+"""
 def compute_center(x1, y1, x2, y2):
     cx = (x1 + x2) / 2
     cy = (y1 + y2) / 2
     return cx, cy
 
+
+"""
+make_square_box
+From a rectangular box, it makes it square. It's used in the context of face boxes before
+scaling them.
+"""
 def make_square_box(x1, y1, x2, y2):
     h, w = get_height_width(x1, y1, x2, y2)
     cx, cy = compute_center(x1, y1, x2, y2)
@@ -32,6 +53,11 @@ def make_square_box(x1, y1, x2, y2):
     new_y2 = cy + side / 2
     return new_x1, new_y1, new_x2, new_y2
 
+
+"""
+scale_box
+Increases/decreases proportionally the height and width of a box. scale is the factor with which to scale. scale > 1 , the box increases; scale < 1 the box decreases.
+"""
 def scale_box(x1, y1, x2, y2, scale):
     h, w = get_height_width(x1, y1, x2, y2)
     cx, cy = compute_center(x1, y1, x2, y2)
@@ -44,6 +70,10 @@ def scale_box(x1, y1, x2, y2, scale):
     return new_x1, new_y1, new_x2, new_y2
 
 
+"""
+estimate_head_box
+From a person box, it estimates the head position. The guesses are that it's gonna be at the top n% (top_h) along the y-axis and in the center (cnt_width) of the x-axis.
+"""
 def estimate_head_box(x1, y1, x2, y2, top_h=0.4, cnt_width=0.5):
     h, w = get_height_width(x1, y1, x2, y2)
     new_y1 = y1
@@ -54,6 +84,17 @@ def estimate_head_box(x1, y1, x2, y2, top_h=0.4, cnt_width=0.5):
     new_x2 = x_center + new_width / 2
     return new_x1, new_y1, new_x2, new_y2
 
+
+"""
+compute_face_box
+Computes the face box given a face model and a scaling factor (see scale_box). 
+In case of no detections found or confidence < .75 , it will raise an IndexError that will be caught by detect_faces.
+face_model is usually imported like this:
+
+from huggingface_hub import hf_hub_download
+face_model_path = hf_hub_download(repo_id="arnabdhar/YOLOv8-Face-Detection", filename="model.pt")
+face_model = YOLO(face_model_path)
+"""
 def compute_face_box(frame, face_model, scale):
     results = face_model(frame, classes=[0], verbose=False)  # Class 0 = person
     if len(results[0].boxes) == 0:
@@ -62,13 +103,18 @@ def compute_face_box(frame, face_model, scale):
     if confidence < 0.75:
         raise IndexError
     # end if confidence < 0.75:
-    box = results[0].boxes.xyxy[0] # INCREASE THESE BOUNDING BOXES
+    box = results[0].boxes.xyxy[0] 
     x1, y1, x2, y2 = box
     new_x1, new_y1, new_x2, new_y2 = make_square_box(x1, y1, x2, y2)
     new_x1, new_y1, new_x2, new_y2 = scale_box(new_x1, new_y1, new_x2, new_y2, scale)
     new_x1, new_y1, new_x2, new_y2 = map(int, [new_x1, new_y1, new_x2, new_y2])
     return new_x1, new_y1, new_x2, new_y2, confidence
 
+
+"""
+compute_occluded_face_box
+Computes a face box in the case of no face detection by the face_model. It estimates the approximate position of a face based on the person box 
+"""
 def compute_occluded_face_box(frame, person_model):
     results = person_model(frame, classes=[0], verbose=False)
     if len(results[0].boxes) == 0:
@@ -84,9 +130,15 @@ def compute_occluded_face_box(frame, person_model):
     return new_x1, new_y1, new_x2, new_y2, confidence
 
 
+"""
+smooth_face_detection
+Takes care of the situations in which there is a too abrupt change in the face detection
+INPUT:
+    - coords: np.ndarray (6, time) -> its rows are these [face_presence, confidence, x1, y1, x2, y2] , face presence being 0 if no face was detected, 1 if a face was detected by a person model, 2 if a face was detected by the person model
+"""
 def smooth_face_detection(coords):
-    for i in range(1, coords.shape[1] - 1):
-        if coords[0, i-1] == coords[0, i+1] and coords[0, i] != coords[0, i-1]:
+    for i in range(1, coords.shape[1] - 1): # loops over all the timepoints except from the 0th and the last, because they don't have either a previous or a successive point
+        if coords[0, i-1] == coords[0, i+1] and coords[0, i] != coords[0, i-1]: # if the previous and successive points are the same, but still they are different from the point to be considered, then we gotta change the current point
             if coords[0, i] == 0: # if the model didn't detect any face but still before and after it did, we plug the previous coords
                 coords[1:, i] = coords[1:, i-1]
             # end if a[0, i] == 0:
@@ -95,27 +147,47 @@ def smooth_face_detection(coords):
     # end for i in range(1, a.shape[1] - 1):
     return coords
 
+
+"""
+detect_faces
+Loops through all the frames of a video and detects one face for each of them. If the face model doesn't reliably detect any face, it falls back to the person model, and if no person is detected with high confidence, it says that there is no face. face_model detections are normal faces, person_model detections are occluded faces. 
+INPUT:
+    - video: np.ndarray (t, h, w, c) -> the video, read with read_video in image_processing.utils
+    - face_model -> usually imported like this:
+          from huggingface_hub import hf_hub_download
+          face_model_path = hf_hub_download(repo_id="arnabdhar/YOLOv8-Face-Detection", filename="model.pt")
+          face_model = YOLO(face_model_path)
+    - person_model -> usually imported like this:
+          person_model_path = f'{path_to_weights}/yolov8n.pt'
+          person_model = YOLO(person_model_path)
+    - scale: float -> the degree to which we have to increase the face box detected by the face model
+
+OUTPUT:
+    - coords: np.ndarray (6, t) -> its rows are these [face_presence, confidence, x1, y1, x2, y2] , face presence being 0 if no face was detected, 1 if a face was detected by a person model, 2 if a face was detected by the person model
+
+"""
 def detect_faces(video, face_model, person_model, scale):
     coords = []
     for i in range(video.shape[0]):
         frame = video[i,:,:,:]
-        try:
+        try: # tries to detect a face with the face_model
             x1, y1, x2, y2, confidence = compute_face_box(frame, face_model, scale=scale)
             face_presence = 1 # face present
             confidence = round(confidence, 3)
-        except IndexError:
-            try:
+        except IndexError: # if face_model detects no face
+            try: # tries  to detect a face with the person_model
                 x1, y1, x2, y2, confidence = compute_occluded_face_box(frame, person_model)
                 confidence = round(confidence, 3)
                 face_presence = 2 # occluded
-            except IndexError:
+            except IndexError: # if person_model detects no person
                 x1, y1, x2, y2, confidence = None, None, None, None, None
                 face_presence = 0 # face absent
             # end except IndexError:
         # end except IndexError:
-        coords.append(np.array([face_presence, confidence, x1, y1, x2, y2]));
+        coords.append(np.array([face_presence, confidence, x1, y1, x2, y2])); # updates coords
     # end for i in range(video.shape[0]):
-    coords = np.stack(coords, axis=1)
-    coords = smooth_face_detection(coords)
+    coords = np.stack(coords, axis=1) # converts it into an array
+    coords = smooth_face_detection(coords) # smooths it so that we don't have isolated points
     return coords
 # EOF
+
