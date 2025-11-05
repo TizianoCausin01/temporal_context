@@ -12,16 +12,23 @@ def get_video_dimensions(cap):
     return round(height), round(width), round(n_frames) # round to make them int
 
 
-def read_video(paths, rank, fn):
-    video_path = f"{paths['livingstone_lab']}/Stimuli/movies/faceswap_3/{fn}" # to be changed once the movies will be all in one folder
+def read_video(paths, rank, fn, vid_duration=0):
+    video_path = f"{paths['livingstone_lab']}/Stimuli/Movies/all_videos/{fn}" 
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
         raise FileNotFoundError(f"Cannot open video file: {video_path}")
     height, width, n_frames = get_video_dimensions(cap)
-    video = np.zeros((n_frames, height, width, 3), dtype=np.uint8) # standard [B, H, W, C]
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    if vid_duration == 0:
+        frames_to_loop = n_frames
+    else:
+        frames_to_loop = round(vid_duration * fps)
+    # end if vid_duration == 0:
+    
+    video = np.zeros((frames_to_loop, height, width, 3), dtype=np.uint8) # standard [B, H, W, C]
     counter = 0
     total = cap.get(cv2.CAP_PROP_FRAME_COUNT)
-    for frame_idx in range(n_frames):
+    for frame_idx in range(frames_to_loop):
         ret, frame = cap.read()
         if not ret:
             raise RuntimeError(f"Failed to read frame {counter} from {video_path}")

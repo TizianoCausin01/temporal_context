@@ -1,5 +1,9 @@
 import os, yaml, sys
 import numpy as np
+from scipy.io import savemat
+sys.path.append("..")
+from image_processing.utils import read_video
+from general_utils.utils import print_wise
 
 
 """
@@ -180,7 +184,7 @@ def detect_faces(video, face_model, person_model, scale):
                 confidence = round(confidence, 3)
                 face_presence = 2 # occluded
             except IndexError: # if person_model detects no person
-                x1, y1, x2, y2, confidence = None, None, None, None, None
+                x1, y1, x2, y2, confidence = np.nan, np.nan, np.nan, np.nan, np.nan 
                 face_presence = 0 # face absent
             # end except IndexError:
         # end except IndexError:
@@ -191,3 +195,18 @@ def detect_faces(video, face_model, person_model, scale):
     return coords
 # EOF
 
+
+"""
+par_detect_faces
+Another version for the function above adapted for parallel processing
+"""
+def par_detect_faces(paths, rank, fn, face_model, person_model, scale):
+    outfn = f"{paths['livingstone_lab']}/tiziano/models/human_face_detection_{fn[:-4]}.mat" # [:-4] slice to take off the mp4 extension
+    if os.path.exists(outfn):
+        print_wise(f"model already exists at {outfn}", rank=rank)
+        return None
+    else:
+        video = read_video(paths, rank, fn, vid_duration=1)
+        coords = detect_faces(video, face_model, person_model, scale)
+        print_wise(f"model saved at {outfn}", rank=rank)
+        savemat(outfn, {"coords": coords})
