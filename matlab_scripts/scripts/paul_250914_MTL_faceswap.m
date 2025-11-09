@@ -1,27 +1,23 @@
 clear all
 close all
-addpath('/n/data2/hms/neurobio/livingstone/Code/data_loading_code_peter_branch')
-addpath('/n/data2/hms/neurobio/livingstone/Code/matpl')
-addpath('/n/data2/hms/neurobio/livingstone/marge/margemonkeys/complexities')
-addpath('/n/data2/hms/neurobio/livingstone/Code/npy-matlab-master')
-addpath('/n/data2/hms/neurobio/livingstone/Stimuli/fewerOO')
-addpath(genpath('/n/data2/hms/neurobio/livingstone/Code/umapAndEppFileExchange_4_5'))
-addpath('/n/data2/hms/neurobio/livingstone/Data/Ephys-Raw')
+addpath("../src")
+paths = get_paths()
+addpath(sprintf('%s/Code/data-loading-code-peterbranch', paths.livingstone_lab))
+addpath(sprintf('%s/Code/matpl', paths.livingstone_lab))
+addpath(sprintf('%s/Code/npy-matlab-master', paths.livingstone_lab))
+addpath(sprintf('%s/Stimuli/fewerOO', paths.livingstone_lab))
+addpath(genpath(sprintf('%s/Code/umapAndEppFileExchange_4_5', paths.livingstone_lab)))
+addpath(sprintf('%s/Data/Data-Ephys-Raw', paths.livingstone_lab))
 
 %% Parameters
 % data locations
-data_formatted = '/n/data2/hms/neurobio/livingstone/Data/Formatted/';
-data_neuropixel = '/n/data2/hms/neurobio/livingstone/Data/Npx-Preprocessed/';
-% addpath('./npy-matlab-master/npy-matlab/')
-% [meta,rasters,lfps,Trials] = loadFormattedData('dat123879001.plx', 'expControlFN', '200201_red_screening_omniplex.bhv2', ...
-%     'expControl','ML','equipment','PLEXON', 'rasterWindow',[0 300], 'savepsth',1,'alignToPhotodiode',0,'continuous',0);
-image_dir = '/n/data2/hms/neurobio/livingstone/Stimuli/faceswap_4/';
+data_formatted = sprintf('%s/Data/Data-Formatted/', paths.livingstone_lab);
+data_neuropixel = sprintf('%s/Data/Data-Neuropixels-Preprocessed/', paths.livingstone_lab);
+image_dir = sprintf('%s/Stimuli/faceswap_4/', paths.livingstone_lab);
 addpath(genpath(image_dir));
-% goodch=[1 3 10 12 23 36 45 61 62];
 colorjet=colormap(jet);
 %% Parameters
 % data locations
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 exp0_name = 'paul_250914';
 exp_name = 'temp';
 chanpos_exp_name = 'paul_250914';  % use a day when all 383 chans were present and IMRO table was the same
@@ -41,7 +37,6 @@ clear Stimuli noisI
 clear mua0_path mua11_path mua1_path mua2_path mua3_path mua4_path mua5_path mua6_path mua7_path mua9_path mua8_path mua10_path
 
 chanpos_path = fullfile(data_neuropixel,[chanpos_exp_name,'/catgt_',chanpos_exp_name,'_g0/',chanpos_exp_name,'_g0_imec1/']);
-% Spikes.channel_xy = readNPY(fullfile(chanpos_path,'channel_positions.npy'));
 
 load(fullfile(chanpos_path,'channel_positions.mat'));
 sel = [1:191 193:384];
@@ -53,49 +48,17 @@ channel_depth_sorted = channel_depth(I);
 figure; plot(channel_depth_sorted)
 filename='depths.jpg';
 imtosave = getframe(gcf);
-imwrite(imtosave.cdata, ['/n/data2/hms/neurobio/livingstone/marge/figimages/',exp_name,'/',filename], 'jpg')
+imwrite(imtosave.cdata, ['/Users/tizianocausin/figimages/',exp_name,'/',filename], 'jpg')
 close all
 
 
 %% Make rasters (clusters x time x presentations)
-%
-% rasters0 = zeros(n_clusters,window_length,n_presentations0,'single');
-% tic
-% for i = 1:n_presentations0
-%     window0 = round(Stimuli0(i).start_time + Spikes.raster_window(1));
-%     rasters0(:,:,i) = mua0(:,window0:window0+window_length-1);
-%     if mod(i,100)==0 || i==n_presentations0; fprintf('%i out of %i\n',i, n_presentations0); end
-% end
-% toc
-
 mua0=(mua0(I,:));
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
 fps=30;
 frametime=1000/fps;
 exp_name='temp';
 %% Load data
-% - task + stimuli info
-% range=[1 20
-%     21 40
-%     41 60
-%     61 80
-%     81 100
-%     101 120
-%     121 140
-%     141 160
-%     161 180
-%     181 200
-%     201 220
-%     221 240
-%     241 260
-%     262 280
-%     282 300
-%     301 320
-%     321 340
-%     341 360
-%     362 383];
+
 range=[1 40
     41 80
     81 120
@@ -109,6 +72,7 @@ range=[1 40
     ];
 
 %% Make rasters (units x time x presentations)
+eps = 10e-9;
 for vidno=1:size(Stimulia,1)
     allmovienames{vidno}=Stimulia(vidno).filename;
 end
@@ -156,7 +120,7 @@ for movieno=1:size(movienames,2)
             rasters(:,1:size(rastersa,2),rastercount)=rastersa;
             clear alleyeposns
             for vframe=1:numframes_ML-1
-                frameduration=round(frameTime_perframe_ML(1,vframe)):floor(frameTime_perframe_ML(1,vframe+1));
+                frameduration=round(frameTime_perframe_ML(1,vframe)):floor(frameTime_perframe_ML(1,vframe+1)+eps);
                 for rnge=1:10
                     firingrateperframe(rnge,thismoviecount,vframe)=squeeze(nanmean(nanmean(rastersa(range(rnge,1):range(rnge,2),frameduration),1),2));
                     firingrateinbin(rnge,thismoviecount,vframe,:)=squeeze(nanmean(rastersa(range(rnge,1):range(rnge,2),frameduration),1));
@@ -181,8 +145,7 @@ for movieno=1:size(movienames,2)
             filename=([movienames{movieno},' byrange.jpg']);
             set(gca,'tickdir','out','linew',2); box on
             imtosave = getframe(gcf);
-            imwrite(imtosave.cdata, ['/n/data2/hms/neurobio/livingstone/marge/figimages/',exp_name,'/',filename], 'jpg')
-            % close all
+            imwrite(imtosave.cdata, ['/Users/tizianocausin/figimages/',exp_name,'/',filename], 'jpg')
         end
         firingrateperframeavg=median(firingrateperframe,1);
         firingrateinbinavg=squeeze(nanmean(nanmean(firingrateinbin,1),2));
@@ -214,19 +177,19 @@ for movieno=1:size(movienames,2)
         end
 
 
-        audiovideofilename=(['/n/data2/hms/neurobio/livingstone/marge/figimages/temp/250914-depths',movienames{movieno},'.avi']);
-        writerObj = vision.VideoFileWriter(audiovideofilename,'AudioInputPort',true);
-        for k = 1:1:numframes_ML-1
-            tosave=squeeze(vidframe_short(:,:,:,k));
-            num_bins = 1628;
-            % % Generate a vector of uniform random numbers
-            random_numbers = rand(1, num_bins);
-            spike_train=interp(squeeze(firingrateinbinavg(k,:)),44);%was 44
-            spike_train(spike_train<0.075)=0;
-            spike_train(spike_train>=0.075)=1;
-            step(writerObj,tosave,spike_train')
-        end
-        release(writerObj)
+        % audiovideofilename=(['/Users/tizianocausin/figimages/temp/250914-depths/',movienames{movieno},'.avi']);
+        % writerObj = vision.VideoFileWriter(audiovideofilename,'AudioInputPort',true);
+        % for k = 1:1:numframes_ML-1
+        %     tosave=squeeze(vidframe_short(:,:,:,k));
+        %     num_bins = 1628;
+        %     % Generate a vector of uniform random numbers
+        %     random_numbers = rand(1, num_bins);
+        %     spike_train=interp(squeeze(firingrateinbinavg(k,:)),44);
+        %     spike_train(spike_train<0.075)=0;
+        %     spike_train(spike_train>=0.075)=1;
+        %     step(writerObj,tosave,spike_train')
+        % end
+        % release(writerObj)
 
 
         %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -243,8 +206,8 @@ end
         filename=('eyeposns.jpg');
         set(gca,'tickdir','out','linew',2); box on
         imtosave = getframe(gcf);
-        imwrite(imtosave.cdata, ['/n/data2/hms/neurobio/livingstone/marge/figimages/',exp_name,'/',filename], 'jpg')
-         close all
+        imwrite(imtosave.cdata, ['/Users/tizianocausin/figimages/',exp_name,'/',filename], 'jpg')
+         
 
 figure;
 imagesc(squeeze(zscore(nanmean(rasters,3),[],2)))
@@ -252,7 +215,7 @@ xlabel('Time from stim on, ms')
 ylabel('Channel depth, mm')
 filename='rastersZbynum.png';
 imtosave = getframe(gcf);
-imwrite(imtosave.cdata, ['/n/data2/hms/neurobio/livingstone/marge/figimages/',exp_name,'/',filename], 'jpg');
+imwrite(imtosave.cdata, ['/Users/tizianocausin/figimages/',exp_name,'/',filename], 'jpg');
 close gcf
 
 
@@ -262,5 +225,5 @@ xlabel('Time from stim on, ms')
 ylabel('Channel depth, mm')
 filename=('rastersbynum.png');
 imtosave = getframe(gcf);
-imwrite(imtosave.cdata, ['/n/data2/hms/neurobio/livingstone/marge/figimages/',exp_name,'/',filename], 'jpg');
+imwrite(imtosave.cdata, ['/Users/tizianocausin/figimages/',exp_name,'/',filename], 'jpg');
 close gcf

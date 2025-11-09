@@ -4,9 +4,8 @@ addpath("../src")
 paths = get_paths()
 addpath(sprintf('%s/Code/data-loading-code-peterbranch', paths.livingstone_lab))
 addpath(sprintf('%s/Code/matpl', paths.livingstone_lab))
-addpath(sprintf('%s/marge/margemonkeys/complexities', paths.livingstone_lab))
 addpath(sprintf('%s/Code/npy-matlab-master', paths.livingstone_lab))
-addpath(sprintf('%s/Stimuli/fewerOO', paths.livingstone_lab))
+addpath(sprintf ('%s/Stimuli/fewerOO', paths.livingstone_lab))
 addpath(genpath(sprintf('%s/Code/umapAndEppFileExchange_4_5', paths.livingstone_lab)))
 addpath(sprintf('%s/Data/Data-Ephys-Raw', paths.livingstone_lab))
 
@@ -14,16 +13,13 @@ addpath(sprintf('%s/Data/Data-Ephys-Raw', paths.livingstone_lab))
 % data locations
 data_formatted = sprintf('%s/Data/Data-Formatted/', paths.livingstone_lab);
 data_neuropixel = sprintf('%s/Data/Data-Neuropixels-Preprocessed/', paths.livingstone_lab);
-% addpath('./npy-matlab-master/npy-matlab/')
-% [meta,rasters,lfps,Trials] = loadFormattedData('dat123879001.plx', 'expControlFN', '200201_red_screening_omniplex.bhv2', ...
-%     'expControl','ML','equipment','PLEXON', 'rasterWindow',[0 300], 'savepsth',1,'alignToPhotodiode',0,'continuous',0);
 image_dir = sprintf('%s/Stimuli/faceswap_4/', paths.livingstone_lab);
 addpath(genpath(image_dir));
 % goodch=[1 3 10 12 23 36 45 61 62];
 colorjet=colormap(jet);
 %% Parameters
 % data locations
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 exp0_name = 'paul_250914';
 exp_name = 'temp';
 chanpos_exp_name = 'paul_250914';  % use a day when all 383 chans were present and IMRO table was the same
@@ -43,7 +39,6 @@ clear Stimuli noisI
 clear mua0_path mua11_path mua1_path mua2_path mua3_path mua4_path mua5_path mua6_path mua7_path mua9_path mua8_path mua10_path
 
 chanpos_path = fullfile(data_neuropixel,[chanpos_exp_name,'/catgt_',chanpos_exp_name,'_g0/',chanpos_exp_name,'_g0_imec0/']);
-% Spikes.channel_xy = readNPY(fullfile(chanpos_path,'channel_positions.npy'));
 
 load(fullfile(chanpos_path,'channel_positions.mat'));
 sel = [1:191 193:384];
@@ -55,49 +50,18 @@ channel_depth_sorted = channel_depth(I);
 figure; plot(channel_depth_sorted)
 filename='depths.jpg';
 imtosave = getframe(gcf);
-%imwrite(imtosave.cdata, ['/n/data2/hms/neurobio/livingstone/marge/figimages/',exp_name,'/',filename], 'jpg')
 close all
 
 
 %% Make rasters (clusters x time x presentations)
-%
-% rasters0 = zeros(n_clusters,window_length,n_presentations0,'single');
-% tic
-% for i = 1:n_presentations0
-%     window0 = round(Stimuli0(i).start_time + Spikes.raster_window(1));
-%     rasters0(:,:,i) = mua0(:,window0:window0+window_length-1);
-%     if mod(i,100)==0 || i==n_presentations0; fprintf('%i out of %i\n',i, n_presentations0); end
-% end
-% toc
 
 mua0=(mua0(I,:)); % 383 x 1267347 (channels x time in ms)
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
 fps=30;
 frametime=1000/fps;
 exp_name='temp';
 %% Load data (units ranges Idk according to which criterion?)
-% - task + stimuli info
-% range=[1 20
-%     21 40
-%     41 60
-%     61 80
-%     81 100
-%     101 120
-%     121 140
-%     141 160
-%     161 180
-%     181 200
-%     201 220
-%     221 240
-%     241 260
-%     262 280
-%     282 300
-%     301 320
-%     321 340
-%     341 360
-%     362 383];
+
 range=[1 40
     41 80
     81 120
