@@ -258,6 +258,7 @@ def preprocess_log_density(log_density_prediction, new_dims):
     pmf = np.exp(log_density_prediction)/np.sum(np.exp(log_density_prediction))
     log_density_prediction = cv2.resize(log_density_prediction.squeeze(), new_dims)
     pmf_flat = pmf.flatten(order="F")
+    pmf_flat = pmf_flat.astype(np.float16)
     return pmf_flat
 
 
@@ -278,7 +279,7 @@ compute_dg_saliency
 Wrapper to compute the deep-gaze visual saliency in parallel
 """
 def compute_dg_saliency(paths, rank, fn, model, resize_factor):
-    outfn = f"{paths['livingstone_lab']}/tiziano/models/dgIIE_{fn[:-4]}.mat" # [:-4] slice to take off the mp4 extension
+    outfn = f"{paths['livingstone_lab']}/tiziano/models/dgIIE_{fn[:-4]}.npz" # [:-4] slice to take off the mp4 extension
     if os.path.exists(outfn):
         print_wise(f"model already exists at {outfn}", rank=rank)
         return None
@@ -288,7 +289,7 @@ def compute_dg_saliency(paths, rank, fn, model, resize_factor):
         new_dims = (round(w*resize_factor), round(h*resize_factor))
         centerbias = compute_centerbias(paths, h, w)
         video_saliency = []
-        for i_frame in range(video.shape[0]):
+        for i_frame in range(3): #video.shape[0]):
             current_frame = video[i_frame, :, :, :]
             input = prepare_dg_input(current_frame)
             dg_saliency = dg_pass(input, model, centerbias, new_dims)
@@ -296,6 +297,7 @@ def compute_dg_saliency(paths, rank, fn, model, resize_factor):
             if i_frame%10 == 0: # such that every tenth frame it prints out the progression
                 print_wise(f"frame {i_frame} computed", rank=rank)
         video_saliency = np.stack(video_saliency, axis=1)
-        savemat(outfn, {"features" : video_saliency}) 
+        #savemat(outfn, {"features" : video_saliency}) 
+        np.savez_compressed(outfn, data=video_saliency)
         print_wise(f"model saved at {outfn}", rank=rank)
 #EOF
