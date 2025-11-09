@@ -1,56 +1,86 @@
 clear all
 close all
-addpath('/n/data2/hms/neurobio/livingstone/Code/data_loading_code_peter_branch')
-addpath('/n/data2/hms/neurobio/livingstone/Code/matpl')
-addpath('/n/data2/hms/neurobio/livingstone/marge/margemonkeys/complexities')
-addpath('/n/data2/hms/neurobio/livingstone/Code/npy-matlab-master')
-addpath(['/n/data2/hms/neurobiolivingstone/Stimuli/fewerOO'])
-addpath(genpath('/n/data2/hms/neurobio/livingstone/Code/umapAndEppFileExchange_4_5'))
-%addpath('/n/data2/hms/neurobio/livingstone/Data/Ephys-Raw') % can't find
-
+addpath("../src")
+paths = get_paths()
+addpath(sprintf('%s/Code/data-loading-code-peterbranch', paths.livingstone_lab))
+addpath(sprintf('%s/Code/matpl', paths.livingstone_lab))
+addpath(sprintf('%s/Code/npy-matlab-master', paths.livingstone_lab))
+addpath(sprintf ('%s/Stimuli/fewerOO', paths.livingstone_lab))
+addpath(genpath(sprintf('%s/Code/umapAndEppFileExchange_4_5', paths.livingstone_lab)))
+addpath(sprintf('%s/Data/Data-Ephys-Raw', paths.livingstone_lab))
 
 %% Parameters
 % data locations
-data_formatted = '/n/data2/hms/neurobio/livingstone/Data/Formatted/';
-data_neuropixel = '/n/data2/hms/neurobio/livingstone/Data/Npx-Preprocessed/';
-% addpath('./npy-matlab-master/npy-matlab/')
-% [meta,rasters,lfps,Trials] = loadFormattedData('dat123879001.plx', 'expControlFN', '200201_red_screening_omniplex.bhv2', ...
-%     'expControl','ML','equipment','PLEXON', 'rasterWindow',[0 300], 'savepsth',1,'alignToPhotodiode',0,'continuous',0);
-image_dir = '/n/data2/hms/neurobio/livingstone/Stimuli/faceswap_4/';
+data_formatted = sprintf('%s/Data/Data-Formatted/', paths.livingstone_lab);
+data_neuropixel = sprintf('%s/Data/Data-Neuropixels-Preprocessed/', paths.livingstone_lab);
+image_dir = sprintf('%s/Stimuli/faceswap_4/', paths.livingstone_lab);
 addpath(genpath(image_dir));
-% goodch=[1 3 10 12 23 36 45 61 62];
 colorjet=colormap(jet);
 %% Parameters
 % data locations
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-fmt_data_dir = '/n/data2/hms/neurobio/livingstone/Data/Formatted/';
 
 expa_name='paul_20250914';
 exp_name = 'temp';
 
 %% Load data
 
-fmt_data_patha = fullfile(fmt_data_dir, [expa_name '_experiment.mat']);
+fmt_data_patha = fullfile(data_formatted, [expa_name '_experiment.mat']);
 load(fmt_data_patha)
-rasters_patha = fullfile(fmt_data_dir, [expa_name '-rasters.h5']);
+%%
+rasters_patha = fullfile(data_formatted, [expa_name '-rasters.h5']);
 long_rastersa = h5read(rasters_patha, '/rasters');  % size (n_units, time_ms)
 unit_namesa = h5read(rasters_patha, '/unit_names');  % size (n_units, 1)
 Stimulia=Stimuli; clear Stimuli
 goodch=[3 12 13 15 16 24 32 36 45 55 58 64];
 %% Make rasters (clusters x time x presentations)
 %
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%
 fps=30;
 frametime=1000/fps;
 exp_name='temp';
-%% Load data
 
 %% Make rasters (units x time x presentations)
+for videono=1:size(Stimulia,1)
+        fixlocs = [0 0];
+        
+        if Trials(Stimulia(videono).trial_number).success==1
+            % disp({"inside", Stimulia(videono).trial_number})
+            trialend=Stimulia(videono).stop_time;        
+        else
+            trialend=Trials(Stimulia(videono).trial_number).stop_time;
+        end;
+        trialstart=Stimulia(videono).start_time;
+        diff = trialend-trialstart;
+        a(videono) = diff;
+        disp({Stimulia(videono).filename, diff})
+end
+%%
 for vidno=1:size(Stimulia,1)
     allmovienames{vidno}=Stimulia(vidno).filename;
 end
+movienames=unique(allmovienames);
+movieno = 1;
+fn2load = sprintf('%s',image_dir,movienames{movieno});
+videoHeader = VideoReader(fn2load);
+numframes=0;
+while hasFrame(videoHeader) %loops over all the frames of the movie part
+    frame=readFrame(videoHeader);
+    numframes=numframes+1;
+    frameTime_perframe_vh(numframes) = 1000*videoHeader.CurrentTime;
+    vidframe(:,:,:,numframes)=imresize(frame,[108 192]);;
+end
+%%
+a = round((1/30:1/30:10.368)*1000,1)
 
+% frameTime_perframe_vh
+frameTime_perframe_vh == a
+%%
+videoHeader.FrameRate
+%%
+close all
+eps = 10e-9;
+for vidno=1:size(Stimulia,1)
+    allmovienames{vidno}=Stimulia(vidno).filename;
+end
 movienames=unique(allmovienames);
 
 rastercount=0;
@@ -93,12 +123,10 @@ for movieno=1:size(movienames,2)
             bin = round(trialstart) : round(trialend);
             numframes_ML=endframe-startframe;
             frameTime_perframe_ML =1+ frameTime_perframe_vh(1,startframe:endframe)-frameTime_perframe_vh(1,1);
-             rastersa = long_rastersa(:,bin);
-            % rastercount=rastercount+1;
-            % rasters(:,1:size(rastersa,2),rastercount)=rastersa;
+            rastersa = long_rastersa(:,bin);
             clear alleyeposns
             for vframe=1:numframes_ML-1
-                frameduration=round(frameTime_perframe_ML(1,vframe)):floor(frameTime_perframe_ML(1,vframe+1));
+                frameduration=round(frameTime_perframe_ML(1,vframe)):floor(frameTime_perframe_ML(1,vframe+1)+eps);
                 for sitee=1:64
                     site=sitee;
                     firingrateperframe(sitee,thismoviecount,vframe)=squeeze(nanmean(nanmean(rastersa(site,frameduration),1),2));
@@ -123,9 +151,9 @@ for movieno=1:size(movienames,2)
             plot(smoothdata(squeeze(nanmean(firingrateperframe(sitee,:,1:275),2)),'gaussian',[5 5]),'k','linew',2)
             set(gca,'tickdir','out','linew',2); box on
             filename=([movienames{movieno},' sites1to8.jpg']);
-            set(gca,'tickdir','out','linew',2); box on; axis off
+            set(gca,'tickdir','out','linew',2); box on; 
             imtosave = getframe(gcf);
-            imwrite(imtosave.cdata, ['/n/data2/hms/neurobio/livingstone/marge/figimages/',exp_name,'/',filename], 'jpg')
+            imwrite(imtosave.cdata, ['/Users/tizianocausin/figimages/',exp_name,'/',filename], 'jpg')
             % close all
         end
 figure
@@ -139,9 +167,9 @@ figure
             plot(smoothdata(squeeze(nanmean(firingrateperframe(sitee,:,1:275),2)),'gaussian',[5 5]),'k','linew',2)
             set(gca,'tickdir','out','linew',2); box on
             filename=([movienames{movieno},' sites9to16.jpg']);
-            set(gca,'tickdir','out','linew',2); box on; axis off
+            set(gca,'tickdir','out','linew',2); box on; 
             imtosave = getframe(gcf);
-            imwrite(imtosave.cdata, ['/n/data2/hms/neurobio/livingstone/marge/figimages/',exp_name,'/',filename], 'jpg')
+            imwrite(imtosave.cdata, ['/Users/tizianocausin/figimages/',exp_name,'/',filename], 'jpg')
             % close all
         end
 figure
@@ -155,9 +183,9 @@ for sitee=17:24
             plot(smoothdata(squeeze(nanmean(firingrateperframe(sitee,:,1:275),2)),'gaussian',[5 5]),'k','linew',2)
             set(gca,'tickdir','out','linew',2); box on
             filename=([movienames{movieno},' sites17to24.jpg']);
-            set(gca,'tickdir','out','linew',2); box on; axis off
+            set(gca,'tickdir','out','linew',2); box on; 
             imtosave = getframe(gcf);
-            imwrite(imtosave.cdata, ['/n/data2/hms/neurobio/livingstone/marge/figimages/',exp_name,'/',filename], 'jpg')
+            imwrite(imtosave.cdata, ['/Users/tizianocausin/figimages/',exp_name,'/',filename], 'jpg')
             % close all
         end
 
@@ -172,9 +200,9 @@ for sitee=25:32
             plot(smoothdata(squeeze(nanmean(firingrateperframe(sitee,:,1:275),2)),'gaussian',[5 5]),'k','linew',2)
             set(gca,'tickdir','out','linew',2); box on
             filename=([movienames{movieno},' sites25to32.jpg']);
-            set(gca,'tickdir','out','linew',2); box on; axis off
+            set(gca,'tickdir','out','linew',2); box on; 
             imtosave = getframe(gcf);
-            imwrite(imtosave.cdata, ['/n/data2/hms/neurobio/livingstone/marge/figimages/',exp_name,'/',filename], 'jpg')
+            imwrite(imtosave.cdata, ['/Users/tizianocausin/figimages/',exp_name,'/',filename], 'jpg')
             % close all
         end
 
@@ -189,9 +217,9 @@ for sitee=33:40
             plot(smoothdata(squeeze(nanmean(firingrateperframe(sitee,:,1:275),2)),'gaussian',[5 5]),'k','linew',2)
             set(gca,'tickdir','out','linew',2); box on
             filename=([movienames{movieno},' sites33to40.jpg']);
-            set(gca,'tickdir','out','linew',2); box on; axis off
+            set(gca,'tickdir','out','linew',2); box on; 
             imtosave = getframe(gcf);
-            imwrite(imtosave.cdata, ['/n/data2/hms/neurobio/livingstone/marge/figimages/',exp_name,'/',filename], 'jpg')
+            imwrite(imtosave.cdata, ['/Users/tizianocausin/figimages/',exp_name,'/',filename], 'jpg')
             % close all
         end
 
@@ -206,9 +234,9 @@ for sitee=41:48
             plot(smoothdata(squeeze(nanmean(firingrateperframe(sitee,:,1:275),2)),'gaussian',[5 5]),'k','linew',2)
             set(gca,'tickdir','out','linew',2); box on
             filename=([movienames{movieno},' sites41to48.jpg']);
-            set(gca,'tickdir','out','linew',2); box on; axis off
+            set(gca,'tickdir','out','linew',2); box on; 
             imtosave = getframe(gcf);
-            imwrite(imtosave.cdata, ['/n/data2/hms/neurobio/livingstone/marge/figimages/',exp_name,'/',filename], 'jpg')
+            imwrite(imtosave.cdata, ['/Users/tizianocausin/figimages/',exp_name,'/',filename], 'jpg')
             % close all
         end
 
@@ -224,9 +252,9 @@ for sitee=49:56
             plot(smoothdata(squeeze(nanmean(firingrateperframe(sitee,:,1:275),2)),'gaussian',[5 5]),'k','linew',2)
             set(gca,'tickdir','out','linew',2); box on
             filename=([movienames{movieno},' sites49to56.jpg']);
-            set(gca,'tickdir','out','linew',2); box on; axis off
+            set(gca,'tickdir','out','linew',2); box on; 
             imtosave = getframe(gcf);
-            imwrite(imtosave.cdata, ['/n/data2/hms/neurobio/livingstone/marge/figimages/',exp_name,'/',filename], 'jpg')
+            imwrite(imtosave.cdata, ['/Users/tizianocausin/figimages/',exp_name,'/',filename], 'jpg')
             % close all
         end
 
@@ -241,9 +269,9 @@ for sitee=57:64
             plot(smoothdata(squeeze(nanmean(firingrateperframe(sitee,:,1:275),2)),'gaussian',[5 5]),'k','linew',2)
             set(gca,'tickdir','out','linew',2); box on
             filename=([movienames{movieno},' sites57to64.jpg']);
-            set(gca,'tickdir','out','linew',2); box on; axis off
+            set(gca,'tickdir','out','linew',2); box on; 
             imtosave = getframe(gcf);
-            imwrite(imtosave.cdata, ['/n/data2/hms/neurobio/livingstone/marge/figimages/',exp_name,'/',filename], 'jpg')
+            imwrite(imtosave.cdata, ['/Users/tizianocausin/figimages/',exp_name,'/',filename], 'jpg')
             % close all
         end
 
@@ -280,7 +308,7 @@ for sitee=57:64
         end
 
 
-        audiovideofilename=(['/n/data2/hms/neurobio/livingstone/marge/figimages/temp/250914-depths',movienames{movieno},'.avi']);
+        audiovideofilename=(['/Users/tizianocausin/figimages/temp/250914-depths',movienames{movieno},'.avi']);
         writerObj = vision.VideoFileWriter(audiovideofilename,'AudioInputPort',true);
         for k = 1:1:numframes_ML-1
             tosave=squeeze(vidframe_short(:,:,:,k));
@@ -309,7 +337,7 @@ end
         filename=('eyeposns.jpg');
         set(gca,'tickdir','out','linew',2); box on
         imtosave = getframe(gcf);
-        imwrite(imtosave.cdata, ['/n/data2/hms/neurobio/livingstone/marge/figimages/',exp_name,'/',filename], 'jpg')
+        imwrite(imtosave.cdata, ['/Users/tizianocausin/figimages/',exp_name,'/',filename], 'jpg')
          close all
 
 
