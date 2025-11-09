@@ -4,9 +4,10 @@ addpath('/n/data2/hms/neurobio/livingstone/Code/data_loading_code_peter_branch')
 addpath('/n/data2/hms/neurobio/livingstone/Code/matpl')
 addpath('/n/data2/hms/neurobio/livingstone/marge/margemonkeys/complexities')
 addpath('/n/data2/hms/neurobio/livingstone/Code/npy-matlab-master')
-addpath('/n/data2/hms/neurobio/livingstone/Stimuli/fewerOO')
+addpath(['/n/data2/hms/neurobiolivingstone/Stimuli/fewerOO'])
 addpath(genpath('/n/data2/hms/neurobio/livingstone/Code/umapAndEppFileExchange_4_5'))
-addpath('/n/data2/hms/neurobio/livingstone/Data/Ephys-Raw')
+%addpath('/n/data2/hms/neurobio/livingstone/Data/Ephys-Raw') % can't find
+
 
 %% Parameters
 % data locations
@@ -58,11 +59,15 @@ for movieno=1:size(movienames,2)
     % load video header, and reset and prepare optical flow vector
     videoHeader = VideoReader(fn2load);
     numframes=0;
+    nFrames = floor(videoHeader.Duration * videoHeader.FrameRate);
+    frameTime_perframe_vh = zeros(1, nFrames);
+    vidframe = zeros(108, 192, 3, nFrames, 'uint8');
     while hasFrame(videoHeader) %loops over all the frames of the movie part
         frame=readFrame(videoHeader);
+        disp(size(frame))
         numframes=numframes+1;
         frameTime_perframe_vh(numframes) = 1000*videoHeader.CurrentTime;
-        vidframe(:,:,:,numframes)=imresize(frame,[108 192]);;
+        vidframe(:,:,:,numframes)=imresize(frame,[108 192]);
     end
     % rasters=nan(size(goodch,1),10100,size(Stimulia,1));
     thismoviecount=0;
