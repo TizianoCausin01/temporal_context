@@ -336,7 +336,7 @@ def ICF_loop(video, resize_factor, check_point, new_saver, input_tensor, log_den
             h, w = video.shape[1:3] 
             new_dims = (round(w*resize_factor), round(h*resize_factor))
             video_saliency = []
-            for i_frame in range(3):
+            for i_frame in range(video.shape[0]):
                 input = video[i_frame, :,:,:]
                 log_density_prediction = sess.run(log_density_wo_centerbias, {
                 input_tensor: input[np.newaxis, :,:,:],
