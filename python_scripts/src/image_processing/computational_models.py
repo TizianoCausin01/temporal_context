@@ -219,7 +219,10 @@ def par_detect_faces(paths, rank, fn, face_model, person_model, scale):
         savemat(outfn, {"coords": coords})
 
 
-
+"""
+compute_centerbias
+Creates centerbias for deepgaze by loading it from the model_weights folder
+"""
 def compute_centerbias(paths, h, w):
     centerbias_template = np.load(f'{paths['livingstone_lab']}/tiziano/model_weights/deep_gaze/centerbias_mit1003.npy') # downloaded at https://github.com/matthias-k/DeepGaze/releases/download/v1.0.0/centerbias_mit1003.npy
     # rescale to match image size
@@ -229,14 +232,25 @@ def compute_centerbias(paths, h, w):
     centerbias = torch.from_numpy(centerbias) #.float().to(device)
     centerbias = centerbias.unsqueeze(0)
     return centerbias
+#EOF
 
+
+"""
+prepare_dg_input
+prepares the input for deep gaze such that it's [B C H W] and torch. B=1
+"""
 def prepare_dg_input(frame):
     input = frame.transpose(2,0,1)
     input = torch.from_numpy(input) #.float().to(device)
     input = input.unsqueeze(0)
     return input
+#EOF
 
 
+"""
+dg_pass
+Computes the deep gaze output and translates it back to probability from log probability.
+"""
 def dg_pass(input, model, centerbias, new_dims):
     with torch.no_grad():
         log_density_prediction = model(input, centerbias)
@@ -244,7 +258,13 @@ def dg_pass(input, model, centerbias, new_dims):
     d = np.exp(log_density_prediction)/np.sum(np.exp(log_density_prediction))
     d_flat = d.flatten(order="F")
     return d_flat
+#EOF
 
+
+"""
+compute_dg_saliency
+Wrapper to compute the deep-gaze visual saliency in parallel
+"""
 def compute_dg_saliency(paths, rank, fn, model, resize_factor):
     outfn = f"{paths['livingstone_lab']}/tiziano/models/dgIIE_{fn[:-4]}.mat" # [:-4] slice to take off the mp4 extension
     if os.path.exists(outfn):
@@ -261,7 +281,9 @@ def compute_dg_saliency(paths, rank, fn, model, resize_factor):
             input = prepare_dg_input(current_frame)
             dg_saliency = dg_pass(input, model, centerbias, new_dims)
             video_saliency.append(dg_saliency)
-            print_wise(f"frame {i_frame} computed")
+            if i%10 == 0: # such that every tenth frame it prints out the progression
+                print_wise(f"frame {i_frame} computed", rank=rank)
         video_saliency = np.stack(video_saliency, axis=1)
         savemat(outfn, {"features" : video_saliency}) 
         print_wise(f"model saved at {outfn}", rank=rank)
+#EOF
