@@ -19,6 +19,6 @@ person_model_path = f"{paths['livingstone_lab']}/tiziano/model_weights/yolov8n.p
 person_model = YOLO(person_model_path)
 video_dir = f"{paths['livingstone_lab']}/Stimuli/Movies/all_videos"
 video_fn = os.listdir(video_dir)
-people_vids = [fn for fn in video_fn if ("IMG" not in fn) and ("YDX" not in fn)]
+people_vids = [fn for fn in video_fn if ("IMG" not in fn)]
 scale = 1.5
 master_workers_queue(people_vids, paths, par_detect_faces, *(face_model, person_model, scale))
