@@ -290,7 +290,7 @@ def compute_dg_saliency(paths, rank, fn, model, resize_factor):
         new_dims = (round(w*resize_factor), round(h*resize_factor))
         centerbias = compute_centerbias(paths, h, w)
         video_saliency = []
-        for i_frame in range(3): #video.shape[0]):
+        for i_frame in range(video.shape[0]):
             current_frame = video[i_frame, :, :, :]
             input = prepare_dg_input(current_frame)
             dg_saliency = dg_pass(input, model, centerbias, new_dims)
