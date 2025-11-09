@@ -206,7 +206,7 @@ def par_detect_faces(paths, rank, fn, face_model, person_model, scale):
         print_wise(f"model already exists at {outfn}", rank=rank)
         return None
     else:
-        video = read_video(paths, rank, fn, vid_duration=1)
+        video = read_video(paths, rank, fn, vid_duration=0)
         coords = detect_faces(video, face_model, person_model, scale)
         print_wise(f"model saved at {outfn}", rank=rank)
         savemat(outfn, {"coords": coords})
