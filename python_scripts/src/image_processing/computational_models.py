@@ -2,6 +2,7 @@ import os, yaml, sys
 import numpy as np
 import torch
 import cv2
+import tensorflow.compat.v1 as tf
 from scipy.io import savemat
 from scipy.ndimage import zoom
 from scipy.special import logsumexp
@@ -301,3 +302,48 @@ def compute_dg_saliency(paths, rank, fn, model, resize_factor):
         np.savez_compressed(outfn, data=video_saliency)
         print_wise(f"model saved at {outfn}", rank=rank)
 #EOF
+
+
+def ICF_setup(paths):
+    tf.reset_default_graph()
+    tf.disable_v2_behavior()
+    check_point = f"{paths['livingstone_lab']}/tiziano/model_weights/deep_gaze/ICF.ckpt"  # DeepGaze II
+    new_saver = tf.train.import_meta_graph('{}.meta'.format(check_point))
+    input_tensor = tf.get_collection('input_tensor')[0]
+    # in case we wanted the center bias
+    # centerbias_tensor = tf.get_collection('centerbias_tensor')[0]
+    # log_density = tf.get_collection('log_density')[0]
+    log_density_wo_centerbias = tf.get_collection('log_density_wo_centerbias')[0]
+    return check_point, new_saver, input_tensor, log_density_wo_centerbias
+
+
+def compute_ICF_saliency(paths, rank, fn, check_point, new_saver, input_tensor, log_density_wo_centerbias):
+    outfn = f"{paths['livingstone_lab']}/tiziano/models/ICF_{fn[:-4]}.mat" # [:-4] slice to take off the mp4 extension
+    if os.path.exists(outfn):
+        print_wise(f"model already exists at {outfn}", rank=rank)
+        return None
+    else:
+        check_point, new_saver, input_tensor, log_density_wo_centerbias = ICF_setup(paths)
+        video = read_video(paths, rank, fn, vid_duration=0)
+        features = ICF_loop(video, check_point, new_saver, input_tensor, log_density_wo_centerbias)
+        np.savez_compressed(outfn, data=features)
+        print_wise(f"model saved at {outfn}", rank=rank)
+
+
+def ICF_loop(video, resize_factor, check_point, new_saver, input_tensor, log_density_wo_centerbias):
+        with tf.Session() as sess:
+            new_saver.restore(sess, check_point)
+            h, w = video.shape[1:3] 
+            new_dims = (round(w*resize_factor), round(h*resize_factor))
+            video_saliency = []
+            for i_frame in range(3):
+                input = video[i_frame, :,:,:]
+                log_density_prediction = sess.run(log_density_wo_centerbias, {
+                input_tensor: input[np.newaxis, :,:,:],
+                })
+                d_flat = preprocess_log_density(log_density_prediction, new_dims)
+                video_saliency.append(d_flat)
+            # end for i in range(3):
+        # end with tf.Session() as sess:
+        video_saliency = np.stack(video_saliency, axis=1)
+        return video_saliency
