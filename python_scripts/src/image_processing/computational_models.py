@@ -1,6 +1,13 @@
 import os, yaml, sys
 import numpy as np
+import torch
+import cv2
 from scipy.io import savemat
+from scipy.ndimage import zoom
+from scipy.special import logsumexp
+sys.path.append("../DeepGaze")
+import deepgaze_pytorch
+
 sys.path.append("..")
 from image_processing.utils import read_video
 from general_utils.utils import print_wise
@@ -210,3 +217,51 @@ def par_detect_faces(paths, rank, fn, face_model, person_model, scale):
         coords = detect_faces(video, face_model, person_model, scale)
         print_wise(f"model saved at {outfn}", rank=rank)
         savemat(outfn, {"coords": coords})
+
+
+
+def compute_centerbias(paths, h, w):
+    centerbias_template = np.load(f'{paths['livingstone_lab']}/tiziano/model_weights/deep_gaze/centerbias_mit1003.npy') # downloaded at https://github.com/matthias-k/DeepGaze/releases/download/v1.0.0/centerbias_mit1003.npy
+    # rescale to match image size
+    centerbias = zoom(centerbias_template, (h/centerbias_template.shape[0], w/centerbias_template.shape[1]), order=0, mode='nearest')
+    # renormalize log density
+    centerbias -= logsumexp(centerbias)
+    centerbias = torch.from_numpy(centerbias) #.float().to(device)
+    centerbias = centerbias.unsqueeze(0)
+    return centerbias
+
+def prepare_dg_input(frame):
+    input = frame.transpose(2,0,1)
+    input = torch.from_numpy(input) #.float().to(device)
+    input = input.unsqueeze(0)
+    return input
+
+
+def dg_pass(input, model, centerbias, new_dims):
+    with torch.no_grad():
+        log_density_prediction = model(input, centerbias)
+    log_density_prediction = cv2.resize(log_density_prediction.numpy().squeeze(), new_dims)
+    d = np.exp(log_density_prediction)/np.sum(np.exp(log_density_prediction))
+    d_flat = d.flatten(order="F")
+    return d_flat
+
+def compute_dg_saliency(paths, rank, fn, model, resize_factor):
+    outfn = f"{paths['livingstone_lab']}/tiziano/models/dgIIE_{fn[:-4]}.mat" # [:-4] slice to take off the mp4 extension
+    if os.path.exists(outfn):
+        print_wise(f"model already exists at {outfn}", rank=rank)
+        return None
+    else: 
+        video = read_video(paths, rank, fn)
+        h, w = video.shape[1:3] 
+        new_dims = (round(w*resize_factor), round(h*resize_factor))
+        centerbias = compute_centerbias(paths, h, w)
+        video_saliency = []
+        for i_frame in range(video.shape[0]):
+            current_frame = video[i_frame, :, :, :]
+            input = prepare_dg_input(current_frame)
+            dg_saliency = dg_pass(input, model, centerbias, new_dims)
+            video_saliency.append(dg_saliency)
+            print_wise(f"frame {i_frame} computed")
+        video_saliency = np.stack(video_saliency, axis=1)
+        savemat(outfn, {"features" : video_saliency}) 
+        print_wise(f"model saved at {outfn}", rank=rank)
