@@ -257,7 +257,7 @@ def preprocess_log_density(log_density_prediction, new_dims):
     if type(log_density_prediction) !=  np.ndarray:
         log_density_prediction = log_density_prediction.numpy()
     pmf = np.exp(log_density_prediction)/np.sum(np.exp(log_density_prediction))
-    log_density_prediction = cv2.resize(log_density_prediction.squeeze(), new_dims)
+    pmf = cv2.resize(pmf.squeeze(), new_dims)
     pmf_flat = pmf.flatten(order="F")
     pmf_flat = pmf_flat.astype(np.float16)
     return pmf_flat
@@ -317,15 +317,15 @@ def ICF_setup(paths):
     return check_point, new_saver, input_tensor, log_density_wo_centerbias
 
 
-def compute_ICF_saliency(paths, rank, fn, check_point, new_saver, input_tensor, log_density_wo_centerbias):
-    outfn = f"{paths['livingstone_lab']}/tiziano/models/ICF_{fn[:-4]}.mat" # [:-4] slice to take off the mp4 extension
+def compute_ICF_saliency(paths, rank, fn, resize_factor, check_point, new_saver, input_tensor, log_density_wo_centerbias):
+    outfn = f"{paths['livingstone_lab']}/tiziano/models/ICF_{fn[:-4]}.npz" # [:-4] slice to take off the mp4 extension
     if os.path.exists(outfn):
         print_wise(f"model already exists at {outfn}", rank=rank)
         return None
     else:
         check_point, new_saver, input_tensor, log_density_wo_centerbias = ICF_setup(paths)
         video = read_video(paths, rank, fn, vid_duration=0)
-        features = ICF_loop(video, check_point, new_saver, input_tensor, log_density_wo_centerbias)
+        features = ICF_loop(video, resize_factor, check_point, new_saver, input_tensor, log_density_wo_centerbias)
         np.savez_compressed(outfn, data=features)
         print_wise(f"model saved at {outfn}", rank=rank)
 
@@ -336,7 +336,7 @@ def ICF_loop(video, resize_factor, check_point, new_saver, input_tensor, log_den
             h, w = video.shape[1:3] 
             new_dims = (round(w*resize_factor), round(h*resize_factor))
             video_saliency = []
-            for i_frame in range(video.shape[0]):
+            for i_frame in range(2): #video.shape[0]):
                 input = video[i_frame, :,:,:]
                 log_density_prediction = sess.run(log_density_wo_centerbias, {
                 input_tensor: input[np.newaxis, :,:,:],
