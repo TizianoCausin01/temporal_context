@@ -248,15 +248,27 @@ def prepare_dg_input(frame):
 
 
 """
+preprocess_log_density
+First it brings the log density into probability mass, and then it reduces the size of the PMF, 
+renormalizes and flattens according to matlab's order
+"""
+def preprocess_log_density(log_density_prediction, new_dims):
+    if type(log_density_prediction) !=  np.ndarray:
+        log_density_prediction = log_density_prediction.numpy()
+    pmf = np.exp(log_density_prediction)/np.sum(np.exp(log_density_prediction))
+    log_density_prediction = cv2.resize(log_density_prediction.squeeze(), new_dims)
+    pmf_flat = pmf.flatten(order="F")
+    return pmf_flat
+
+
+"""
 dg_pass
 Computes the deep gaze output and translates it back to probability from log probability.
 """
 def dg_pass(input, model, centerbias, new_dims):
     with torch.no_grad():
         log_density_prediction = model(input, centerbias)
-    log_density_prediction = cv2.resize(log_density_prediction.numpy().squeeze(), new_dims)
-    d = np.exp(log_density_prediction)/np.sum(np.exp(log_density_prediction))
-    d_flat = d.flatten(order="F")
+    d_flat = preprocess_log_density(log_density_prediction, new_dims) 
     return d_flat
 #EOF
 
