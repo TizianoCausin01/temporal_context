@@ -293,7 +293,7 @@ def compute_dg_saliency(paths, rank, fn, model, resize_factor):
             input = prepare_dg_input(current_frame)
             dg_saliency = dg_pass(input, model, centerbias, new_dims)
             video_saliency.append(dg_saliency)
-            if i%10 == 0: # such that every tenth frame it prints out the progression
+            if i_frame%10 == 0: # such that every tenth frame it prints out the progression
                 print_wise(f"frame {i_frame} computed", rank=rank)
         video_saliency = np.stack(video_saliency, axis=1)
         savemat(outfn, {"features" : video_saliency}) 
