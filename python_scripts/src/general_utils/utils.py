@@ -2,6 +2,7 @@ from datetime import datetime
 import numpy as np
 import argparse
 import yaml
+from scipy.spatial import cKDTree
 
 def print_wise(mex, rank=None):
     if rank == None:
@@ -127,4 +128,29 @@ def get_experiment_parameters():
 def update_experiments_log(experiment_name):
     with open("../experiments_log.txt", "a") as f:
         f.write(f"\n{datetime.now().strftime('%H:%M:%S')} - {experiment_name}")
+# EOF
+
+
+"""
+get_timestamps
+Constructs the timestamps for a time-series 
+"""
+def get_timestamps(n_timepts, sampling_rate):
+    timestamps = np.arange(n_timepts)/sampling_rate
+    return timestamps
+#EOF
+
+
+"""
+get_upsampling_indices
+Upsamples a signals by means of nearest neighbour timept.
+"""
+def get_upsampling_indices(n_old_timepts, old_rate, new_rate):
+    old_timestamps = get_timestamps(n_old_timepts, old_rate)
+    upsample_factor = new_rate/old_rate
+    n_new_timepts = int(np.round(n_old_timepts * upsample_factor))
+    new_timestamps = get_timestamps(n_new_timepts, new_rate)
+    tree = cKDTree(old_timestamps[:, None])
+    _, indices = tree.query(new_timestamps[:, None], k=1) # Query nearest old sample for each new time (like dsearchn)
+    return indices
 # EOF
