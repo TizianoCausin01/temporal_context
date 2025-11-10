@@ -330,20 +330,20 @@ def compute_ICF_saliency(paths, rank, fn, resize_factor, check_point, new_saver,
         print_wise(f"model saved at {outfn}", rank=rank)
 
 
-def ICF_loop(video, resize_factor, check_point, new_saver, input_tensor, log_density_wo_centerbias):
-        with tf.Session() as sess:
-            new_saver.restore(sess, check_point)
-            h, w = video.shape[1:3] 
-            new_dims = (round(w*resize_factor), round(h*resize_factor))
-            video_saliency = []
-            for i_frame in range(video.shape[0]):
-                input = video[i_frame, :,:,:]
-                log_density_prediction = sess.run(log_density_wo_centerbias, {
-                input_tensor: input[np.newaxis, :,:,:],
-                })
-                d_flat = preprocess_log_density(log_density_prediction, new_dims)
-                video_saliency.append(d_flat)
-            # end for i in range(3):
-        # end with tf.Session() as sess:
-        video_saliency = np.stack(video_saliency, axis=1)
-        return video_saliency
+def ICF_loop(video, resize_factor, check_point, new_saver, input_tensor, log_density_wo_centerbias    ):
+     video_saliency = []
+     h, w = video.shape[1:3] 
+     for i_frame in range(video.shape[0]):
+         input = video[i_frame, :,:,:]
+         with tf.Session() as sess:
+             new_saver.restore(sess, check_point)
+             new_dims = (round(w*resize_factor), round(h*resize_factor))
+             log_density_prediction = sess.run(log_density_wo_centerbias, {
+             input_tensor: input[np.newaxis, :,:,:],
+             })  
+         # end with tf.Session() as sess:
+         d_flat = preprocess_log_density(log_density_prediction, new_dims)
+         video_saliency.append(d_flat)
+     # end for i_frame in range(video.shape[0]):
+     video_saliency = np.stack(video_saliency, axis=1)
+     return video_saliency
