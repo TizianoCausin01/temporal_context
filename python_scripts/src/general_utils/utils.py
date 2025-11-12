@@ -1,7 +1,7 @@
+import sys, os, yaml
 from datetime import datetime
 import numpy as np
 import argparse
-import yaml
 from scipy.spatial import cKDTree
 
 def print_wise(mex, rank=None):
@@ -154,3 +154,8 @@ def get_upsampling_indices(n_old_timepts, old_rate, new_rate):
     _, indices = tree.query(new_timestamps[:, None], k=1) # Query nearest old sample for each new time (like dsearchn)
     return indices
 # EOF
+
+
+def delete_empty_keys(data_dict):
+    new_dict = {k: v for k, v in data_dict.items() if v.shape != (0,)}
+    return new_dict

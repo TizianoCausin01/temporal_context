@@ -297,3 +297,35 @@ def wrapper_load_and_save(paths, experiment_name, imec, resolution_Hz, foreperio
     with open(gaze_out_fn, "wb") as f:
         pickle.dump(gaze, f)
 # EOF
+
+
+def concatenate_all_trials(neural_data):
+    all_trials = []
+    for key in neural_data.keys():
+        trial = neural_data[key]
+        if trial.shape != (0,):
+            trial_flat = trial.reshape(trial.shape[0], -1, order="F")
+            all_trials.append(trial_flat)
+    tot_data = np.concatenate(all_trials, axis=1)
+    return tot_data
+
+def get_min_max(tot_data):
+    min_FR = tot_data.min(axis=1, keepdims=True)
+    max_FR = tot_data.max(axis=1, keepdims=True)
+    return min_FR, max_FR
+
+def min_max_normalization(neural_data):
+    tot_data = concatenate_all_trials(neural_data)
+    neural_data_norm = {}
+    min_FR, max_FR = get_min_max(tot_data)
+    FR_range = max_FR - min_FR
+    for key in neural_data.keys():
+        if neural_data[key].shape != (0,):
+            neural_data_norm[key] = []
+            
+            for i_trial in range(neural_data[key].shape[2]):
+                curr_trial = neural_data[key][:,:,i_trial]
+                trial_normalized = (curr_trial - min_FR) / FR_range
+                neural_data_norm[key].append(trial_normalized)
+            neural_data_norm[key] = np.stack(neural_data_norm[key], axis=2)
+    return neural_data_norm
