@@ -1,5 +1,9 @@
 .ipynb_checkpoints
+*png
+*.pdf
 *asv
 __pycache__
 *pyc
 .DS_Store
+literature
+*pt
