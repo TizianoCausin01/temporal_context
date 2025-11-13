@@ -1,6 +1,6 @@
 import os, yaml, sys
-sys.path.append("../DeepGaze")
-import deepgaze_pytorch
+#sys.path.append("../DeepGaze")
+#import deepgaze_pytorch
 
 ENV = os.getenv("MY_ENV", "dev")
 with open("../../config.yaml", "r") as f:
