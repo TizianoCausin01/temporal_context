@@ -5,33 +5,13 @@ import pickle
 import cv2
 sys.path.append("..")
 from general_utils.utils import print_wise, get_upsampling_indices, delete_empty_keys
-from image_processing.utils import get_video_dimensions
+from image_processing.utils import get_video_dimensions, load_stimuli_models
 from data_preprocessing.preprocessing import min_max_normalization
 
 def extract_fixations_onset(fixations, foreperiod_len_timepts=30):
     differences = np.diff(fixations[foreperiod_len_timepts:], prepend=0)
     fixations_onsets = np.where(differences == 1)[0]
     return fixations_onsets
-
-def load_stimuli_models(paths, model_name, file_names, resolution_Hz):
-    all_models = {}
-    models_path = f"{paths['livingstone_lab']}/tiziano/models"
-    for fn in file_names:
-        video_path = f"{paths['livingstone_lab']}/Stimuli/Movies/all_videos/{fn}" 
-        cap = cv2.VideoCapture(video_path)
-        fps = cap.get(cv2.CAP_PROP_FPS)
-        h, w, _ = get_video_dimensions(cap)
-        if (h != 1080) or (w != 1920):
-            raise ValueError("The size of the movie is different to the way eye-tracking were prerpocessed")
-        if model_name=="human_face_detection":
-            curr_model = loadmat(f"{models_path}/{model_name}_{fn[:-4]}.mat")['coords']
-        else:
-            curr_model = np.load(f"{models_path}/{model_name}_{fn[:-4]}.npz")['features']
-        # end model_name=="human_face_detection":
-        indices = get_upsampling_indices(curr_model.shape[1], fps, resolution_Hz)
-        curr_model = curr_model[:, indices]
-        all_models[fn] = curr_model
-    return all_models
 
 
 def load_monkey_data(paths, monkey_name, day, month, resolution_Hz, npx=True, imec_n=0):
