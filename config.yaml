@@ -7,6 +7,16 @@ tiziano_local:
     data_neuropixels: "/Volumes/LivingstoneLab/Data/Data-Neuropixels-Preprocessed"
 
 
+tiziano_mac_mini:
+  paths:
+    src_path: "/Users/tizianocausin/Desktop/temporal_context/python_scripts/src"
+    matlab_src_path: "/Users/tizianocausin/Desktop/temporal_context/matlab_scripts/src"
+    livingstone_lab: "/Users/tizianocausin/livingstone_lab_local"
+    data_formatted: "/Volumes/LivingstoneLab/Data/Data-Formatted"
+    data_neuropixels: "/Volumes/LivingstoneLab/Data/Data-Neuropixels-Preprocessed"
+
+
+
 o2_cluster:
   paths:
     src_path: "/home/tic569/temporal_context/python_scripts/src"
