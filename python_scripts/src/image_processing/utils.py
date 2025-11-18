@@ -1,9 +1,9 @@
 import sys, os
 import cv2
 import numpy as np
-
+from scipy.io import loadmat
 sys.path.append("..")
-from general_utils.utils import print_wise
+from general_utils.utils import print_wise, get_upsampling_indices
 
 def get_video_dimensions(cap):
     height = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)

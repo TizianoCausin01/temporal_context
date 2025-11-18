@@ -3,6 +3,9 @@ from datetime import datetime
 import numpy as np
 import argparse
 from scipy.spatial import cKDTree
+from sklearn.model_selection import KFold
+from sklearn.metrics import accuracy_score 
+
 
 def print_wise(mex, rank=None):
     if rank == None:
@@ -159,3 +162,43 @@ def get_upsampling_indices(n_old_timepts, old_rate, new_rate):
 def delete_empty_keys(data_dict):
     new_dict = {k: v for k, v in data_dict.items() if v.shape != (0,)}
     return new_dict
+
+
+def binary_classification(x, y, n_splits, classification_function, *args, **kwargs):
+    accuracy_list = []
+    kf = KFold(n_splits=n_splits, shuffle=True) 
+    for train_index, test_index in kf.split(x):
+    # Split into training and testing sets
+        x_train, x_test = x[train_index], x[test_index]
+        y_train, y_test = y[train_index], y[test_index]
+    # Initialize the model
+        model = classification_function(*args, **kwargs)
+    # Train the model
+        model.fit(x_train, y_train)
+    # Make predictions
+        y_pred = model.predict(x_test)
+    # Evaluate
+        accuracy_list.append(accuracy_score(y_test, y_pred))
+    avg_accuracy = np.mean(accuracy_list)
+    return avg_accuracy
+
+
+def binary_classification_over_time(condition_1, condition_2, channel_range, n_splits, classification_function, *args, **kwargs):
+    min_trials = min(condition_1.shape[2], condition_2.shape[2]) # even the trials
+#    condition_1, condition_2 = condition_1[:,:,:min_trials], condition_2[:,:,:min_trials]
+    idx1 = np.random.choice(np.arange(0, condition_1.shape[2]), size=min_trials, replace=False)
+    idx2 = np.random.choice(np.arange(0, condition_2.shape[2]), size=min_trials, replace=False)
+    condition_1, condition_2 = condition_1[:,:,idx1], condition_2[:,:,idx2]
+    if condition_1.shape[2] != condition_2.shape[2]:
+        raise IndexError("The number of datapoints across conditions is different")
+    condition_1_label = np.ones(condition_1.shape[2])
+    condition_2_label = np.zeros(condition_2.shape[2])
+    y = np.concatenate((condition_1_label, condition_2_label))
+    x_timeseries = np.concatenate((condition_1, condition_2),axis=2)
+    accuracy_over_time = []
+    for i in range(x_timeseries.shape[1]):
+        x = x_timeseries[channel_range[0]:channel_range[1], i, :].T
+        avg_accuracy = binary_classification(x, y, n_splits, classification_function, *args, **kwargs)
+        accuracy_over_time.append(avg_accuracy)
+    accuracy_over_time = np.array(accuracy_over_time)
+    return accuracy_over_time

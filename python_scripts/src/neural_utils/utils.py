@@ -45,6 +45,7 @@ def get_start_end_chunk(center, foreperiod_len_timepts, n_timepts_bef, n_timepts
 def extract_fixation_responses(n_norm, gaze_data, all_models, n_timepts_bef, n_timepts_aft, foreperiod_len_timepts=30):
     day_non_face_fix = []
     day_face_fix = []
+    day_occluded_face_fix = []
     day_rep_face_fix = []
     for fn in n_norm.keys(): # loops through all the stimuli
         for i in range(n_norm[fn].shape[2]): # loops thourgh all the repetitions
@@ -64,11 +65,22 @@ def extract_fixation_responses(n_norm, gaze_data, all_models, n_timepts_bef, n_t
                     if mod_position[0] == 0: # check if there is no face in the frame
                         on_face = 0
                         day_non_face_fix.append(fix_resp)
-                    else: # if there is a face in the frame
+                    elif mod_position[0] ==1: # if there is a face in the frame
                         if (x_gaze >= x1) and (x_gaze <= x2) and (y_gaze >= y1) and (y_gaze <= y2):
                             if on_face == 0:
                                 on_face = 1
                                 day_face_fix.append(fix_resp)
+                            elif on_face == 1:
+                                day_rep_face_fix.append(fix_resp)
+                            # if on_face == 0:
+                        else:
+                            on_face = 0
+                            day_non_face_fix.append(fix_resp)
+                    elif mod_position[0] ==2: # if there is a face in the frame
+                        if (x_gaze >= x1) and (x_gaze <= x2) and (y_gaze >= y1) and (y_gaze <= y2):
+                            if on_face == 0:
+                                on_face = 1
+                                day_occluded_face_fix.append(fix_resp)
                             elif on_face == 1:
                                 day_rep_face_fix.append(fix_resp)
                             # if on_face == 0:
@@ -82,13 +94,15 @@ def extract_fixation_responses(n_norm, gaze_data, all_models, n_timepts_bef, n_t
         # end for i in range(n_norm[fn].shape[2]): # loops thourgh all the repetitions
     # end for fn in n_norm.keys(): # loops through all the stimuli
     face_fix = np.stack(day_face_fix, axis=-1)
+    occluded_face_fix = np.stack(day_occluded_face_fix, axis=-1)
     non_face_fix = np.stack(day_non_face_fix, axis=-1)
     rep_face_fix = np.stack(day_rep_face_fix, axis=-1)
-    return face_fix, non_face_fix, rep_face_fix
+    return face_fix, occluded_face_fix, non_face_fix, rep_face_fix
 
 
 def face_fixations(paths, monkey_name, days, month, npx, imec_n, resolution_Hz, n_timepts_bef, n_timepts_aft, foreperiod_len_timepts, model_name, normalization):
     tot_face_fixation = []
+    tot_occluded_face_fixation = []
     tot_rep_face_fixation = []
     tot_non_face_fixation = []
     for day in days: # loops through the days of recording # to be changed 
@@ -103,15 +117,17 @@ def face_fixations(paths, monkey_name, days, month, npx, imec_n, resolution_Hz, 
         
         # loads and upsamples the model 
         all_models = load_stimuli_models(paths, model_name, n_norm.keys(), resolution_Hz)
-        day_face_fix, day_non_face_fix, day_rep_face_fix = extract_fixation_responses(n_norm, gaze_data, all_models, n_timepts_bef, n_timepts_aft, foreperiod_len_timepts=foreperiod_len_timepts)
-        day_non_face_fix = day_non_face_fix[:,:,:day_face_fix.shape[2]] # to make their size even I'd have to do a random choice actually
+        day_face_fix, day_occluded_face_fix, day_non_face_fix, day_rep_face_fix = extract_fixation_responses(n_norm, gaze_data, all_models, n_timepts_bef, n_timepts_aft, foreperiod_len_timepts=foreperiod_len_timepts)
+#        day_non_face_fix = day_non_face_fix[:,:,:day_face_fix.shape[2]] # to make their size even I'd have to do a random choice actually
         tot_face_fixation.append(day_face_fix)
+        tot_occluded_face_fixation.append(day_occluded_face_fix)
         tot_non_face_fixation.append(day_non_face_fix)
         tot_rep_face_fixation.append(day_rep_face_fix)
 
         print_wise(f"computed day {day} of monkey {monkey_name}")
     tot_face_fixation = np.concatenate(tot_face_fixation, axis=2)
+    tot_occluded_face_fixation = np.concatenate(tot_occluded_face_fixation, axis=2)
     tot_non_face_fixation = np.concatenate(tot_non_face_fixation, axis=2)    
     tot_rep_face_fixation = np.concatenate(tot_rep_face_fixation, axis=2)    
-    return tot_face_fixation, tot_non_face_fixation, tot_rep_face_fixation
+    return tot_face_fixation, tot_occluded_face_fixation, tot_non_face_fixation, tot_rep_face_fixation
 
