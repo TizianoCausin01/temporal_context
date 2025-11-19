@@ -2,6 +2,8 @@ import sys, os, yaml
 from datetime import datetime
 import numpy as np
 import argparse
+from sklearn.metrics.pairwise import pairwise_distances
+from scipy.spatial.distance import pdist
 from scipy.spatial import cKDTree
 from sklearn.model_selection import KFold
 from sklearn.metrics import accuracy_score 
@@ -51,17 +53,102 @@ INPUT:
 OUTPUT:
     - corr_mat: np.ndarray(float) -> (tpts x tpts) the matrix of cross-correlation
 """
-def autocorr_mat(data, data2=None):
+def autocorr_mat(data, data2=None, metric='correlation'):
     if data2 is None:
         corr_mat = np.corrcoef(data, rowvar=False)
     else:
-        d1_shape = data.shape
-        d2_shape = data2.shape
-        corr_mat = np.corrcoef(data, data2, rowvar=False) # in the future I'll create a corr function with numba
-        corr_mat = corr_mat[:d1_shape[1], d2_shape[1]:]
+        if metric == 'correlation':
+            d1_shape = data.shape
+            d2_shape = data2.shape
+            corr_mat = np.corrcoef(data, data2, rowvar=False) 
+            corr_mat = corr_mat[:d1_shape[1], d2_shape[1]:]
+        else:
+            corr_mat = pairwise_distances(data.T, data2.T, metric=metric)
+        # end if metric == 'correlation':
+    # end if data2 is None:
     return corr_mat
 # EOF
 
+
+"""
+create_RDM
+Creates an RDM with a specific distance metric and then indexes it with the triu method.
+INPUT:
+- data: np.array (features x datapoints) -> the data matrix
+- metric: str or custom function -> the distance metric
+OUTPUT:
+- RDM_vec: np.array ([1/2 *(datapoints^2 - datapoints)],) -> the upper triangular entries of the RDM (indexed in a row-major order, excluding diagonal)
+                                                            to go back to the full matrix, it's just squareform(RDM_vec)
+"""
+def create_RDM(data, metric='correlation'):
+    if metric == 'correlation':
+        RDM = 1 - np.corrcoef(data, rowvar=False)
+        rows, cols = np.triu_indices(RDM.shape[0], k=1)
+        RDM_vec = RDM[rows, cols]
+    else:
+        RDM_vec = pdist(data.T, metric=metric)
+    # end if metric == 'pearson':
+    return RDM_vec
+# EOF
+
+
+"""
+spearman
+Computes the spearman's rank correlation coefficient between two vectors.
+the first argsort treats the position in the matrix as rank and the index as the position in the previous matrix. I.e. it gives the indices associated to each position of the sorting, as if applying it we'd get the ordered list
+the second argsort translates the indices into ranks and the position goes back to the initial matrix's position.
+e.g.
+X = np.array([[30, 10, 20], 
+              [5,   1,  9]])
+argsort:
+[[1 2 0]
+ [1 0 2]]
+argsort().argsort():
+[[2 0 1]
+ [1 0 2]]
+"""
+def spearman(x, y):
+    xr = x.argsort().argsort().astype(float)
+    yr = y.argsort().argsort().astype(float)
+    rho = np.corrcoef(xr, yr)[0, 1]
+    return rho
+# EOF
+
+
+"""
+compute_dRSA
+Starting from two data matrices (the neural data and the model) it computes the dRSA between the two.
+1) It computes the RDMs time-series
+2) It compares them one another through correlation or whatever other metric
+INPUT:
+- neural_data: np.ndarray (channels, time, trials) -> the neural data matrix already properly segmented
+- model_data: np.ndarray (channels, time, trials) -> the model data matrix already properly segmented, corresponding to the exact timepoints of the neurons
+- metric_RDM: str or function -> the distance metric used to compute the neural and model RDMs
+- metric_RDM_model: None, str or function -> if not None, the distance metric used to compute the model RDMs
+- metric_dRSA: str or function -> the similarity or dissimilarity metric used to compare the time series of RDMs
+
+OUTPUT:
+- dRSA_mat: np.ndarray (time, time) -> the matrix that compares the two time series of RDMs one another
+"""
+
+def compute_dRSA(neural_data, model_data, metric_RDM='correlation', metric_RDM_model=None, metric_dRSA=spearman):
+    RDMs_neu = []
+    RDMs_mod = []
+    for t in range(neural_data.shape[1]):
+        RDMn_t = create_RDM(neural_data[:,t,:], metric=metric_RDM)
+        if metric_RDM_model is None:
+            RDMm_t = create_RDM(model_data[:,t,:], metric=metric_RDM)
+        else:
+            RDMm_t = create_RDM(model_data[:,t,:], metric=metric_RDM_model)
+        # end if metric_RDM_model is None:
+        RDMs_neu.append(RDMn_t)
+        RDMs_mod.append(RDMm_t)
+    # end for t in range(neural_data.shape[1]):
+    RDMs_neu = np.stack(RDMs_neu, axis=1)
+    RDMs_mod = np.stack(RDMs_mod, axis=1)
+    dRSA_mat = autocorr_mat(RDMs_neu, RDMs_mod, metric=metric_dRSA)
+    return dRSA_mat
+# EOF
 
 
 """
