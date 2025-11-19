@@ -42,7 +42,7 @@ def get_start_end_chunk(center, foreperiod_len_timepts, n_timepts_bef, n_timepts
     end = (center + foreperiod_len_timepts) + n_timepts_aft
     return start, end
 
-def extract_fixation_responses(n_norm, gaze_data, all_models, n_timepts_bef, n_timepts_aft, foreperiod_len_timepts=30):
+def extract_face_fixation_responses(n_norm, gaze_data, all_models, n_timepts_bef, n_timepts_aft, foreperiod_len_timepts=30):
     day_non_face_fix = []
     day_face_fix = []
     day_occluded_face_fix = []
@@ -117,7 +117,7 @@ def face_fixations(paths, monkey_name, days, month, npx, imec_n, resolution_Hz, 
         
         # loads and upsamples the model 
         all_models = load_stimuli_models(paths, model_name, n_norm.keys(), resolution_Hz)
-        day_face_fix, day_occluded_face_fix, day_non_face_fix, day_rep_face_fix = extract_fixation_responses(n_norm, gaze_data, all_models, n_timepts_bef, n_timepts_aft, foreperiod_len_timepts=foreperiod_len_timepts)
+        day_face_fix, day_occluded_face_fix, day_non_face_fix, day_rep_face_fix = extract_face_fixation_responses(n_norm, gaze_data, all_models, n_timepts_bef, n_timepts_aft, foreperiod_len_timepts=foreperiod_len_timepts)
 #        day_non_face_fix = day_non_face_fix[:,:,:day_face_fix.shape[2]] # to make their size even I'd have to do a random choice actually
         tot_face_fixation.append(day_face_fix)
         tot_occluded_face_fixation.append(day_occluded_face_fix)
