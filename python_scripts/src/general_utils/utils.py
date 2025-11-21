@@ -81,6 +81,9 @@ OUTPUT:
                                                             to go back to the full matrix, it's just squareform(RDM_vec)
 """
 def create_RDM(data, metric='correlation'):
+    if data.shape[1] == 1:
+        raise IndexError('Cannot compute RDM with only 1 trial')
+    # end if data.shape[1] == 1:
     if metric == 'correlation':
         RDM = 1 - np.corrcoef(data, rowvar=False)
         rows, cols = np.triu_indices(RDM.shape[0], k=1)
@@ -163,18 +166,28 @@ OUTPUT:
     - lagplot: np.ndarray -> (max_lag*2 + 1) if not symmetric, otherwise (max_lag +1), it's the correlation coefficient as a function of the lag
 """
 
-def get_lagplot(corr_mat, max_lag=20, min_datapts=10, symmetric=False):
+def get_lagplot(corr_mat, max_lag=20, min_datapts=10, symmetric=False, summary_stat='mean'):
     # first sanity checks    
     get_lagplot_checks(corr_mat, max_lag, min_datapts)
     if not symmetric:
         d = np.diag(corr_mat)
         lagplot = np.zeros(max_lag*2 +1)
-        lagplot[max_lag] = np.nanmean(d)
-        for tau in range(1,max_lag+1): # +1 otherwise it selects the 0th diagonal
-            d = np.diag(corr_mat, -tau)
-            lagplot[max_lag+tau] = np.nanmean(d) # append because the lower triangular correspond to a positive offset between data1 and data2
-            d = np.diag(corr_mat, tau)
-            lagplot[max_lag-tau] = np.nanmean(d) # appendleft because the upper triangular correspond to a negative offset between data1 and data2
+        if summary_stat == 'mean':
+            lagplot[max_lag] = np.nanmean(d)
+            for tau in range(1,max_lag+1): # +1 otherwise it selects the 0th diagonal
+                d = np.diag(corr_mat, -tau)
+                lagplot[max_lag+tau] = np.nanmean(d) # append because the lower triangular correspond to a positive offset between data1 and data2
+                d = np.diag(corr_mat, tau)
+                lagplot[max_lag-tau] = np.nanmean(d) # appendleft because the upper triangular correspond to a negative offset between data1 and data2
+
+        elif summary_stat == 'median':
+            lagplot[max_lag] = np.nanmedian(d)
+            for tau in range(1,max_lag+1): # +1 otherwise it selects the 0th diagonal
+                d = np.diag(corr_mat, -tau)
+                lagplot[max_lag+tau] = np.nanmedian(d) # append because the lower triangular correspond to a positive offset between data1 and data2
+                d = np.diag(corr_mat, tau)
+                lagplot[max_lag-tau] = np.nanmedian(d) # appendleft because the upper triangular correspond to a negative offset between data1 and data2
+        # end if summary_stat == 'mean':
     else:
         d = np.diag(corr_mat)
         lagplot = np.zeros(max_lag +1)
