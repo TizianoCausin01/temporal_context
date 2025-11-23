@@ -50,12 +50,12 @@ def load_stimuli_models(paths, model_name, file_names, resolution_Hz):
         cap = cv2.VideoCapture(video_path)
         fps = cap.get(cv2.CAP_PROP_FPS)
         h, w, _ = get_video_dimensions(cap)
-        if (h != 1080) or (w != 1920):
-            raise ValueError("The size of the movie is different to the way eye-tracking were prerpocessed")
         if model_name=="human_face_detection":
+            if (h != 1080) or (w != 1920):
+                raise ValueError("The size of the movie is different to the way eye-tracking were prerpocessed")
             curr_model = loadmat(f"{models_path}/{model_name}_{fn[:-4]}.mat")['coords']
         else:
-            curr_model = np.load(f"{models_path}/{model_name}_{fn[:-4]}.npz")['features']
+            curr_model = np.load(f"{models_path}/{model_name}_{fn[:-4]}.npz")['data']
         # end model_name=="human_face_detection":
         indices = get_upsampling_indices(curr_model.shape[1], fps, resolution_Hz)
         curr_model = curr_model[:, indices]

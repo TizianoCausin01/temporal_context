@@ -171,6 +171,51 @@ def random_trials_per_rep(n_norm, gaze_data, all_models, trial_len, trials_per_r
 
 
 """
+extract_fixation_responses_sing_trial
+Extracts all the fixations in a single trial, it's the building block for the 2 functions below. To run the time-locked dRSA
+INPUT:
+    - n_norm: Dict{str, np.array} -> it's the normalized neural dictionary. Keys: filenames, values: trials associated to them (channels, timepoints, repetitions).
+    - gaze_data: Dict{str, np.array} -> it's the gaze/fixations dictionary. Keys: filenames, values: trials associated to them (x-y-fixations, timepoints, repetitions).
+    - all_models: Dict{str, np.array} -> it's the models dictionary. Keys: filenames, values: visual information associated to them (features, timepoints, repetitions). 
+    - fn: str -> the filename to be analyzed
+    - i_rep: int -> which repetition of the stimulus we have to extract
+    - n_timepts_bef: int -> how many timepoints to preserve before the fixation
+    - n_timepts_aft: int -> how many timepoints to preserve after the fixation
+    - foreperiod_len_timepts: int -> how many timepoints we added before the beginning of the repetition in the neural and gaze data.
+    - stack: int -> either 0 or 1, if stack==0, it leaves the fixations as a list of np.ndarray (features, timepts), otherwise it stacks the list into a 3d array (see output) 
+OUTPUT:
+    - neural_trials, gaze_trials, model_trials: np.ndarray -> (features, timepoints, fixations) the sampled data to run dRSA
+    or 
+    - neural_trials, gaze_trials, model_trials: list of np.ndarray-> (features, timepoints) fixations) the sampled data to run dRSA
+"""
+def extract_fixation_responses_sing_trial(n_norm, gaze_data, all_models, fn, i_rep, n_timepts_bef, n_timepts_aft, foreperiod_len_timepts=30, stack=0):
+    all_neural_fix = []
+    all_gaze_fix = []
+    all_model_fix = []
+    current_neural = n_norm[fn][:,:,i_rep]
+    current_gaze = gaze_data[fn][:,:,i_rep]
+    current_model = all_models[fn]
+    fixations_vector = current_gaze[2,:] 
+    fixation_onsets = extract_fixations_onset(fixations_vector, foreperiod_len_timepts=foreperiod_len_timepts)
+    for onset in fixation_onsets:
+        start, end = get_start_end_chunk(onset, foreperiod_len_timepts, n_timepts_bef, n_timepts_aft)
+        if not (start < 0 or end > current_neural.shape[1]): # if it's not too close to the beginning or end
+            if not (onset - n_timepts_bef < 0): # checks that the onset doesn't start before the stimulus onset (because we don't have the model for that)
+                neural_fix = current_neural[:,start:end] # indexing period around fixation
+                gaze_fix = current_gaze[:2, start:end] 
+                model_fix = current_model[:, onset-n_timepts_bef:onset+n_timepts_aft]
+                all_neural_fix.append(neural_fix)
+                all_gaze_fix.append(gaze_fix)
+                all_model_fix.append(model_fix)
+    if stack == 1:
+        all_neural_fix = np.stack(all_neural_fix, axis=-1)
+        all_gaze_fix = np.stack(all_gaze_fix, axis=-1)
+        all_model_fix = np.stack(all_model_fix, axis=-1)  
+    # end if stack == 1:
+    return all_neural_fix, all_gaze_fix, all_model_fix
+
+
+"""
 extract_fixation_responses_sing_stim
 Extracts all the fixations in a single stimulus, also across repetitions. To run the time-locked dRSA
 INPUT:
@@ -181,31 +226,60 @@ INPUT:
     - n_timepts_bef: int -> how many timepoints to preserve before the fixation
     - n_timepts_aft: int -> how many timepoints to preserve after the fixation
     - foreperiod_len_timepts: int -> how many timepoints we added before the beginning of the repetition in the neural and gaze data.
-
+    - stack: int -> either 0 or 1, if stack==0, it leaves the fixations as a list of np.ndarray (features, timepts), otherwise it stacks the list into a 3d array (see output) 
 OUTPUT:
-    - neural_trials, gaze_trials, model_trials: np.ndarray -> (features, timepoints, trials) the sampled data to run dRSA
+    - neural_trials, gaze_trials, model_trials: np.ndarray -> (features, timepoints, fixations) the sampled data to run dRSA
+    or 
+    - neural_trials, gaze_trials, model_trials: list of np.ndarray-> (features, timepoints) fixations) the sampled data to run dRSA
 """
-def extract_fixation_responses_sing_stim(n_norm, gaze_data, all_models, fn, n_timepts_bef, n_timepts_aft, foreperiod_len_timepts=30):
+def extract_fixation_responses_sing_stim(n_norm, gaze_data, all_models, fn, n_timepts_bef, n_timepts_aft, foreperiod_len_timepts=30, stack=0):
     all_neural_fix = []
     all_gaze_fix = []
     all_model_fix = []
-    for i in range(n_norm[fn].shape[2]): # loops thourgh all the repetitions
-        current_neural = n_norm[fn][:,:,i]
-        current_gaze = gaze_data[fn][:,:,i]
-        current_model = all_models[fn]
-        fixations_vector = current_gaze[2,:] 
-        fixation_onsets = extract_fixations_onset(fixations_vector, foreperiod_len_timepts=foreperiod_len_timepts)
-        for onset in fixation_onsets:
-            start, end = get_start_end_chunk(onset, foreperiod_len_timepts, n_timepts_bef, n_timepts_aft)
-            if not (start < 0 or end > current_neural.shape[1]): # if it's not too close to the beginning or end
-                if not (onset - n_timepts_bef < 0): # checks that the onset doesn't start before the stimulus onset (because we don't have the model for that)
-                    neural_fix = current_neural[:,start:end] # indexing period around fixation
-                    gaze_fix = current_gaze[:2, start:end] 
-                    model_fix = current_model[:, onset-n_timepts_bef:onset+n_timepts_aft]
-                    all_neural_fix.append(neural_fix)
-                    all_gaze_fix.append(gaze_fix)
-                    all_model_fix.append(model_fix)
-    all_neural_fix = np.stack(all_neural_fix, axis=-1)
-    all_gaze_fix = np.stack(all_gaze_fix, axis=-1)
-    all_model_fix = np.stack(all_model_fix, axis=-1)    
+    for i_rep in range(n_norm[fn].shape[2]): # loops thourgh all the repetitions
+        neural_fix, gaze_fix, model_fix = extract_fixation_responses_sing_trial(n_norm, gaze_data, all_models, fn, i_rep, n_timepts_bef, n_timepts_aft, foreperiod_len_timepts=foreperiod_len_timepts, stack=0)
+        all_neural_fix.extend(neural_fix)
+        all_gaze_fix.extend(gaze_fix)
+        all_model_fix.extend(model_fix)
+    # for i_rep in range(n_norm[fn].shape[2]): # loops thourgh all the repetitions
+    if stack == 1:
+        all_neural_fix = np.stack(all_neural_fix, axis=-1)
+        all_gaze_fix = np.stack(all_gaze_fix, axis=-1)
+        all_model_fix = np.stack(all_model_fix, axis=-1)  
+    # end if stack == 1:  
+    return all_neural_fix, all_gaze_fix, all_model_fix
+
+
+
+"""
+extract_all_fixation_responses
+Extracts all the fixations in a single stimulus, also across repetitions. To run the time-locked dRSA
+INPUT:
+    - n_norm: Dict{str, np.array} -> it's the normalized neural dictionary. Keys: filenames, values: trials associated to them (channels, timepoints, repetitions).
+    - gaze_data: Dict{str, np.array} -> it's the gaze/fixations dictionary. Keys: filenames, values: trials associated to them (x-y-fixations, timepoints, repetitions).
+    - all_models: Dict{str, np.array} -> it's the models dictionary. Keys: filenames, values: visual information associated to them (features, timepoints, repetitions). 
+    - n_timepts_bef: int -> how many timepoints to preserve before the fixation
+    - n_timepts_aft: int -> how many timepoints to preserve after the fixation
+    - foreperiod_len_timepts: int -> how many timepoints we added before the beginning of the repetition in the neural and gaze data.
+    - stack: int -> either 0 or 1, if stack==0, it leaves the fixations as a list of np.ndarray (features, timepts), otherwise it stacks the list into a 3d array (see output) 
+OUTPUT:
+    - neural_trials, gaze_trials, model_trials: np.ndarray -> (features, timepoints, fixations) the sampled data to run dRSA
+    or 
+    - neural_trials, gaze_trials, model_trials: list of np.ndarray-> (features, timepoints) fixations) the sampled data to run dRSA
+"""
+def extract_all_fixation_responses(n_norm, gaze_data, all_models, n_timepts_bef, n_timepts_aft, foreperiod_len_timepts=30, stack=0):
+    all_neural_fix = []
+    all_gaze_fix = []
+    all_model_fix = []
+    for fn in n_norm.keys()[:2]: # loops through all the stimuli
+        neural_fix, gaze_fix, model_fix = extract_all_fixation_responses_sing_stim(n_norm, gaze_data, all_models, fn, n_timepts_bef, n_timepts_aft, foreperiod_len_timepts=foreperiod_len_timepts, stack=0)
+        all_neural_fix.extend(neural_fix)
+        all_gaze_fix.extend(gaze_fix)
+        all_model_fix.extend(model_fix)
+    # end for fn in n_norm.keys()[:2]: # loops through all the stimuli
+    if stack == 1:
+        all_neural_fix = np.stack(all_neural_fix, axis=-1)
+        all_gaze_fix = np.stack(all_gaze_fix, axis=-1)
+        all_model_fix = np.stack(all_model_fix, axis=-1)      
+    # end if stack == 1:
     return all_neural_fix, all_gaze_fix, all_model_fix
