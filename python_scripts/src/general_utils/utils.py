@@ -43,6 +43,33 @@ def get_lagplot_checks(corr_mat, max_lag, min_datapts):
     # end if np.any(nan_mask):
 # EOF
 
+
+"""
+nan_check
+Checks if there are NaN vals in the correlation matrix
+"""
+def nan_check(corr_mat: np.ndarray):
+    nan_mask = np.isnan(corr_mat)
+    if np.any(nan_mask):
+        print_wise(f"There are nans in corr_mat") #{np.where(nan_mask)}")
+    # end if np.any(nan_mask):
+
+
+"""
+choose_summary_stat
+To choose the summary statistics to summarize the diagonals of the autocorrelation matrix
+"""
+def choose_summary_stat(summary_stat: str):
+    if summary_stat == 'mean':
+        stat = np.nanmean
+    elif summary_stat == 'median':
+        stat = np.nanmedian
+    else:
+        raise ValueError("summary_stat must be 'mean' or 'median'")
+    # end if summary_stat == 'mean':
+    return stat
+
+
 """
 autocorr_mat
 Correlates one time-series matrix to itself or one another to yield a timepts x timepts matrix.
@@ -165,38 +192,80 @@ INPUT:
 OUTPUT:
     - lagplot: np.ndarray -> (max_lag*2 + 1) if not symmetric, otherwise (max_lag +1), it's the correlation coefficient as a function of the lag
 """
-
 def get_lagplot(corr_mat, max_lag=20, min_datapts=10, symmetric=False, summary_stat='mean'):
     # first sanity checks    
     get_lagplot_checks(corr_mat, max_lag, min_datapts)
+    stat = choose_summary_stat(summary_stat)
     if not symmetric:
         d = np.diag(corr_mat)
         lagplot = np.zeros(max_lag*2 +1)
-        if summary_stat == 'mean':
-            lagplot[max_lag] = np.nanmean(d)
-            for tau in range(1,max_lag+1): # +1 otherwise it selects the 0th diagonal
-                d = np.diag(corr_mat, -tau)
-                lagplot[max_lag+tau] = np.nanmean(d) # append because the lower triangular correspond to a positive offset between data1 and data2
-                d = np.diag(corr_mat, tau)
-                lagplot[max_lag-tau] = np.nanmean(d) # appendleft because the upper triangular correspond to a negative offset between data1 and data2
-
-        elif summary_stat == 'median':
-            lagplot[max_lag] = np.nanmedian(d)
-            for tau in range(1,max_lag+1): # +1 otherwise it selects the 0th diagonal
-                d = np.diag(corr_mat, -tau)
-                lagplot[max_lag+tau] = np.nanmedian(d) # append because the lower triangular correspond to a positive offset between data1 and data2
-                d = np.diag(corr_mat, tau)
-                lagplot[max_lag-tau] = np.nanmedian(d) # appendleft because the upper triangular correspond to a negative offset between data1 and data2
-        # end if summary_stat == 'mean':
+        lagplot[max_lag] = stat(d)
+        for tau in range(1,max_lag+1): # +1 otherwise it selects the 0th diagonal
+            d = np.diag(corr_mat, -tau)
+            lagplot[max_lag+tau] = stat(d) # append because the lower triangular correspond to a positive offset between data1 and data2
+            d = np.diag(corr_mat, tau)
+            lagplot[max_lag-tau] = stat(d) # appendleft because the upper triangular correspond to a negative offset between data1 and data2
     else:
         d = np.diag(corr_mat)
         lagplot = np.zeros(max_lag +1)
-        lagplot[0] = np.nanmean(d)
+        lagplot[0] = stat(d)
         for tau in range(1,max_lag+1): # +1 otherwise it selects the 0th diagonal
             d = np.diag(corr_mat, tau)
-            lagplot[tau] = np.nanmean(d)
+            lagplot[tau] = stat(d)
     return lagplot
 # EOF
+
+
+"""
+get_lagplot_subset
+Computes the lagplot (average along the diagonals) only within a specific window of the neural and model data.
+INPUT:
+    - corr_mat: np.ndarray(float) -> (tpts x tpts) the auto-correlation or cross-correlation matrix
+    - neural_idx: list/array/range -> time points to consider along neural axis
+    - model_idx: list/array/range -> time points to consider along model axis
+    - max_lag: int -> the maximum offset in tpts
+    - min_datapts: int -> the minimum amount of points that a diagonal should have to be considered acceptable
+    - symmetric: bool -> if we are computing a cross-correlation, corr_mat is not symmetric, otherwise it is
+OUTPUT:
+    - lagplot: np.ndarray -> (max_lag*2 + 1) if not symmetric, otherwise (max_lag +1), it's the correlation coefficient as a function of the lag
+"""
+def get_lagplot_subset(corr_mat, neural_idx, model_idx=None, max_lag=20, min_datapts=10, summary_stat='mean'):
+    nan_check(corr_mat)
+    corr_mat_h, corr_mat_w = corr_mat.shape # rows are neural timepts, cols are model timepts
+    neural_idx = np.array(neural_idx)
+    if model_idx is None: # if no model idx is specified, choose all the models
+        model_idx  = np.array(range(corr_mat_w))
+    else:
+        model_idx  = np.array(model_idx)
+    # end if model_idx is None:
+    
+    lagplot = np.zeros(max_lag*2 + 1) # lagplot from -max_lag to +max_lag with the zero in the middle
+    center = max_lag
+    stat = choose_summary_stat(summary_stat)
+    
+    # compute each lag
+    for tau in range(-max_lag, max_lag+1):
+        diag_vals = []
+        # build all possible aligned pairs
+        for i_neu in neural_idx:
+            i_mod = i_neu + tau  # model index candidate 
+            if i_mod in model_idx:
+                if 0 <= i_neu < corr_mat_h and 0 <= i_mod < corr_mat_w: # check bounds bc i_mod might be out of the matrix
+                    diag_vals.append(corr_mat[i_neu, i_mod])
+                # end if 0 <= i_neu < corr_mat_h and 0 <= i_mod < corr_mat_w:
+            # end if i_mod in model_idx:
+        # end for i_neu in neural_idx:
+
+        if not diag_vals: # if there's nothing in there (because it didn't enter the 2nd if)
+            raise IndexError("The maximum lag is larger than the selected matrix itself")
+        elif len(diag_vals) < min_datapts:
+            print_wise(f"The number of datapoints used to compute extreme offsets is < than {min_datapts}")
+        # end if n_timepts < max_lag:
+        lagplot[center - tau] = stat(diag_vals)
+    # end for tau in range(-max_lag, max_lag+1):
+    return lagplot
+
+
 
 def split_integer(total: int, n: int):
     """Split total into n nearly equal integer parts."""
