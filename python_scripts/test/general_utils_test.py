@@ -7,7 +7,7 @@ with open("../../config.yaml", "r") as f:
     config = yaml.safe_load(f)
 paths = config[ENV]["paths"]
 sys.path.append(paths["src_path"])
-from general_utils import print_wise, get_lagplot, autocorr_mat, create_RDM, spearman, compute_dRSA
+from general_utils.utils import print_wise, get_lagplot, autocorr_mat, create_RDM, spearman, compute_dRSA, nan_check, choose_summary_stat, get_lagplot_subset
 
 # --- Tests for get_lagplot_checks (indirect because we don't export it) ---
 
@@ -168,3 +168,150 @@ def test_compute_dRSA_with_custom_metric():
     dRSA = compute_dRSA(neural, model, metric_dRSA=my_metric)
 
     assert dRSA.shape == (5, 5)
+
+
+from io import StringIO
+
+# --- Tests for nan_check ---
+
+def test_nan_check_no_nan(capsys):
+    """nan_check should print nothing when there are no NaN values."""
+    corr = np.array([[1, 2], [3, 4]])
+    nan_check(corr)
+    captured = capsys.readouterr()
+    assert captured.out == ""
+
+
+def test_nan_check_with_nan(capsys):
+    """nan_check should print a warning when NaN values are present."""
+    corr = np.array([[1, np.nan], [3, 4]])
+    nan_check(corr)
+    captured = capsys.readouterr()
+    assert "There are nans in corr_mat" in captured.out
+    
+
+# --- Tests for choose_summary_stat ---
+
+def test_choose_summary_stat_mean():
+    """Should return np.nanmean when summary_stat='mean'."""
+    stat = choose_summary_stat('mean')
+    assert stat is np.nanmean
+
+
+def test_choose_summary_stat_median():
+    """Should return np.nanmedian when summary_stat='median'."""
+    stat = choose_summary_stat('median')
+    assert stat is np.nanmedian
+
+
+def test_choose_summary_stat_invalid():
+    """Should raise ValueError for invalid summary_stat."""
+    with pytest.raises(ValueError):
+        choose_summary_stat('std')
+
+
+def test_basic_identity_matrix():
+    """Diagonal lags of identity matrix should be 1 at tau=0 and 0 elsewhere."""
+    corr = np.eye(5)
+    max_lag = 2
+
+    out = get_lagplot_subset(corr, neural_idx=range(5), max_lag=max_lag)
+
+    # length check
+    assert len(out) == 2 * max_lag + 1
+
+    center = max_lag
+    # tau = 0
+    assert out[center] == 1.0
+    # tau = ±1, ±2 -> no overlapping ones
+    assert np.all(out[np.arange(len(out)) != center] == 0.0)
+
+
+def test_mean_vs_median():
+    """Check switching the statistic works."""
+    corr = np.array([
+        [1, 2, 3],
+        [4, 5, 6],
+        [7, 8, 9]
+    ])
+    neural_idx = [0, 1, 2]
+
+    out_mean = get_lagplot_subset(corr, neural_idx, max_lag=1, summary_stat="mean")
+    out_median = get_lagplot_subset(corr, neural_idx, max_lag=1, summary_stat="median")
+
+    # center (tau=0): mean and median of diag [1,5,9]
+    assert out_mean[1] == pytest.approx(np.mean([1, 5, 9]))
+    assert out_median[1] == pytest.approx(np.median([1, 5, 9]))
+
+
+def test_custom_indices():
+    """Check the function respects neural_idx and model_idx."""
+    corr = np.arange(25).reshape(5, 5)
+
+    neural_idx = [1, 2, 3]
+    model_idx  = [0, 1, 2, 3, 4]
+
+    out = get_lagplot_subset(corr, neural_idx, model_idx, max_lag=1)
+
+    # tau = 0 → diag values are corr[i,i]
+    expected_tau0 = [corr[i, i] for i in neural_idx]
+    assert out[1] == np.mean(expected_tau0)
+
+    # tau = -1 → corr[i, i+1]
+    expected_tau1 = [corr[i, i+1] for i in neural_idx]
+    assert out[0] == np.mean(expected_tau1)
+
+
+def test_out_of_bounds_raises_error():
+    """If no valid elements exist for a given lag, an IndexError should be raised."""
+    corr = np.eye(3)
+
+    with pytest.raises(IndexError):
+        get_lagplot_subset(corr, neural_idx=[0, 1, 2], max_lag=5)
+
+
+def test_nan_handling():
+    """NaNs should be ignored thanks to np.nanmean / np.nanmedian."""
+    corr = np.array([
+        [1, np.nan],
+        [3, 4]
+    ])
+    with pytest.warns(RuntimeWarning, match="Mean of empty slice"): # because np.nanmean(np.nan)
+        out = get_lagplot_subset(corr, neural_idx=[0, 1], max_lag=1)
+
+    # tau = 0 → diag [1, 4] ⇒ mean = 2.5
+    assert out[1] == pytest.approx(2.5)
+
+
+def test_min_datapts_warning(monkeypatch):
+    """If < min_datapts, print_wise should be called."""
+    corr = np.eye(5)
+
+    # Mock print_wise to track calls
+    called = {"flag": False}
+    def fake_print(msg):
+        called["flag"] = True
+
+    monkeypatch.setattr("general_utils.utils.print_wise", fake_print)
+
+    get_lagplot_subset(corr, neural_idx=[1, 2], max_lag=2, min_datapts=5)
+
+    assert called["flag"] is True
+
+
+def test_compare_lagplot_lagplot_subset():
+    """ checks that get_lagplot_subset falls back to get_lagplot once we consider all datapoints """
+    a = np.random.random((30,30))
+    b = get_lagplot_subset(a,range(a.shape[0]), max_lag=10, min_datapts=1)#, range(0,30))
+    c = get_lagplot(a, max_lag=10, min_datapts=1)
+    assert np.all(np.equal(b,c)) # all vals should be equal 
+
+
+def test_zero_prediction():
+    a = np.random.random((30,30))
+    rows, cols = np.triu_indices(a.shape[0], k=1)  # k=0 includes diagonal, k=1 excludes
+    a[rows, cols] = 0 # Substitute values, e.g., set upper triangle to 0, i.e. all the entries in which t_neu<t_mod (prediction)
+    b = get_lagplot_subset(a,range(a.shape[0])[10:15], max_lag=10, min_datapts=1)#, range(0,30))
+    c = get_lagplot(a, max_lag=10, min_datapts=1)
+    assert np.all(np.equal(b[:10], np.zeros(10)))
+    assert np.all(np.equal(c[:10], np.zeros(10)))
