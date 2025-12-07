@@ -371,3 +371,39 @@ def binary_classification_over_time(condition_1, condition_2, channel_range, n_s
         accuracy_over_time.append(avg_accuracy)
     accuracy_over_time = np.array(accuracy_over_time)
     return accuracy_over_time
+
+
+"""
+multivariate_ou
+Generates a multivariate Ornstein–Uhlenbeck (OU) process with independent
+dimensions, each following an exponentially correlated stochastic trajectory.
+
+The OU process is defined by:
+    x[t] = A * x[t-1] + noise
+where A = exp(-dt / corr_length) controls the decay of temporal correlations.
+
+INPUT:
+    - T: float -> Total duration of the process (in arbitrary time units).
+    - dim: int -> Number of independent OU dimensions to generate.
+    - dt: float -> Time step used to discretize the process.
+    - corr_length: float -> Correlation length (τ). Larger τ → slower decay → more temporal autocorrelation.
+    - sigma: float (default 1.0) -> Noise scale governing the variance of the stochastic term.
+
+OUTPUT:
+    - x: np.ndarray (N, dim) -> Multivariate OU process, where N = int(T / dt) is the number of timepoints.
+          Each column corresponds to one OU dimension.
+"""
+def multivariate_ou(T, dim, dt, corr_length, sigma=1.0, random_state=None):
+    rng = np.random.default_rng(random_state)
+    N = int(T / dt)
+    x = np.zeros((N, dim))
+
+    alpha = dt / corr_length      # decay factor
+    A = np.exp(-alpha)            # autocorrelation coefficient
+
+    for t in range(1, N):
+        noise = sigma * np.sqrt(1 - A**2) * rng.standard_normal(dim)
+        x[t] = A * x[t-1] + noise
+
+    return x
+# EOF
