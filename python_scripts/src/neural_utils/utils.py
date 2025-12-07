@@ -271,8 +271,8 @@ def extract_all_fixation_responses(n_norm, gaze_data, all_models, n_timepts_bef,
     all_neural_fix = []
     all_gaze_fix = []
     all_model_fix = []
-    for fn in n_norm.keys()[:2]: # loops through all the stimuli
-        neural_fix, gaze_fix, model_fix = extract_all_fixation_responses_sing_stim(n_norm, gaze_data, all_models, fn, n_timepts_bef, n_timepts_aft, foreperiod_len_timepts=foreperiod_len_timepts, stack=0)
+    for fn in n_norm.keys(): # loops through all the stimuli
+        neural_fix, gaze_fix, model_fix = extract_fixation_responses_sing_stim(n_norm, gaze_data, all_models, fn, n_timepts_bef, n_timepts_aft, foreperiod_len_timepts=foreperiod_len_timepts, stack=0)
         all_neural_fix.extend(neural_fix)
         all_gaze_fix.extend(gaze_fix)
         all_model_fix.extend(model_fix)

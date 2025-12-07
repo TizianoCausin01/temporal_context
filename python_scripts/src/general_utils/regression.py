@@ -21,14 +21,14 @@ OUTPUT:
 """
 def shift_xy(x, y, tau):
     if tau > 0:  # if positive lag
-        x_shifted = x[:,tau:]   
-        y_shifted = y[:,:-tau] # mod is shifted towards the right (so present neural is being compared with past model)
+        x_shifted = x[:,:-tau] # mod is shifted towards the right (so present neural is being compared with past model)
+        y_shifted = y[:,tau:]   
     elif tau == 0:  # Handle L=0 case explicitly
         x_shifted = x
         y_shifted = y
     else:  # tau < 0
-        x_shifted = x[:,:tau]
-        y_shifted = y[:,-tau:] # mod is shifted towards the left (so present neural is being compared with future model)
+        x_shifted = x[:,-tau:] # mod is shifted towards the left (so present neural is being compared with future model)
+        y_shifted = y[:,:tau]
     # if tau > 0:  # if positive lag
     return x_shifted, y_shifted
 #EOF
