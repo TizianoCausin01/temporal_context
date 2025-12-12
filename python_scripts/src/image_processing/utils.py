@@ -154,3 +154,92 @@ def shuffle_frames(video):
     shuffled_video = video[indices, :, :, :]
     return shuffled_video
 # EOF
+
+
+
+"""
+list_videos
+Creates a list with all videos with the required characteristics.
+INPUT:
+    - paths: dict -> paths to the video files
+    - video_type: str -> the type of videos to index
+OUTPUT:
+    - fn_list: list{str} -> a list with the file names of the required paths (or all the videos if video_type is None)
+"""
+def list_videos(paths: dict, video_type: str):
+    videos_dir = f"{paths['livingstone_lab']}/Stimuli/Movies/all_videos"
+    all_files = os.listdir(videos_dir) 
+    if video_type:
+        if video_type == 'YDX':
+            fn_list = [f for f in all_files if "YDX" in f]
+        elif video_type == 'IMG':
+            fn_list = [f for f in all_files if "IMG" in f]
+        elif video_type == 'faceswap':
+            fn_list = [f for f in all_files if "YDX" not in f and "IMG" not in f]
+        else:
+            raise ValueError("video_type must be 'YDX', 'IMG' or 'faceswap'")
+        return fn_list
+        # end if video_type == 'YDX':
+    else:
+        return all_files
+    # end if video_type:
+# EOF
+
+"""
+get_frames_number
+Computes the number of frames for each video in fn_list, marking which videos exceed a maximum duration and should be truncated.
+
+INPUT:
+    - paths: dict -> dictionary containing base paths (expects key 'livingstone_lab')
+    - fn_list: list -> list of video filenames to process
+    - max_duration: float -> maximum allowed duration in seconds; videos longer than
+                               this are marked as long and truncated
+OUTPUT:
+    - frames_per_vid: list of floats -> number of frames for each video (truncated if long)
+    - long_vids: list of bools -> True for long videos exceeding max_duration, else False
+"""
+def get_frames_number(paths: dict, fn_list: list, max_duration: float):
+    videos_dir = f"{paths['livingstone_lab']}/Stimuli/Movies/all_videos"
+    frames_per_vid = []
+    long_vids = []
+    for fn in fn_list:
+        video_path = os.path.join(videos_dir, fn)
+        cap = cv2.VideoCapture(video_path)
+        _, _, n_frames = get_video_dimensions(cap)
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        if n_frames/fps > max_duration:
+            n_frames = fps*max_duration
+            long_vids.append(True)
+        else:
+            long_vids.append(False)
+        frames_per_vid.append(n_frames)
+    # end for fn in fn_list:
+    return frames_per_vid, long_vids
+# EOF
+
+
+"""
+split_in_batches
+Splits a total number of frames into batches of approximately equal size.
+Useful for distributing frames across workers or for chunked processing.
+PROCESS:
+    1. Computes the total number of frames across all videos.
+    2. Computes how many batches are needed (rounded).
+    3. Splits the frame indices into n_batches approximately equal parts.
+    4. Extracts and stores the size of each batch.
+
+INPUT:
+    - frames_per_vid: list/array of ints -> number of frames for each video
+    - batch_size: int -> desired approximate size of each batch
+OUTPUT:
+    - batch_size_list: list of ints -> sizes of each batch
+    - splits: list of np.ndarray -> the actual index splits (each array contains the indices for that batch)
+"""
+def split_in_batches(frames_per_vid, batch_size):
+    tot_frame_num = round(np.sum(frames_per_vid))
+    n_batches = round(tot_frame_num/batch_size)
+    splits = np.array_split(np.arange(tot_frame_num), n_batches)
+    batch_size_list = []
+    for batch_idx in splits:
+        batch_size_list.append(len(batch_idx)) # stores the current batch size
+    return np.array(batch_size_list) 
