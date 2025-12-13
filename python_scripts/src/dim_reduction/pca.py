@@ -3,7 +3,7 @@ import numpy as np
 from sklearn.decomposition import IncrementalPCA
 from torchvision.models.feature_extraction import create_feature_extractor
 import torch
-
+import joblib
 ENV = os.getenv("MY_ENV", "dev")
 with open("../../config.yaml", "r") as f:
     config = yaml.safe_load(f)
@@ -40,8 +40,8 @@ def ipca_videos(paths, rank, layer_name, model_name, model, n_components, video_
             frames_batch = frames_batch[curr_batch_size:, :, :, :]
             with torch.no_grad():
                 feats = feature_extractor(inputs)[layer_name]
-                print("feats", feats.shape)
-                feats = feats.view(feats.size(0), -1).cpu().numpy()
+                print_wise(f"features shape: {feats.shape}", rank=rank)
+                feats = feats.reshape(feats.size(0), -1).cpu().numpy()
             ipca.partial_fit(feats)
             # end with torch.no_grad():
         

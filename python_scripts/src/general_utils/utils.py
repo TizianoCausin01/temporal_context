@@ -514,24 +514,25 @@ def get_relevant_output_layers(model_name):
         ]
     if model_name == 'resnet50':
         return [
-            'conv1',                         # V1
-            'layer1.0.relu_2',
-            'layer1.1.relu_2',               # V2
-            'layer1.2.relu_2',               # V2
-            'layer2.0.relu_2',
-            'layer2.1.relu_2',               # V4
-            'layer2.2.relu_2',               # V4
-            'layer2.3.relu_2',               # V4
-            'layer3.0.relu_2',
-            'layer3.1.relu_2',               # V4/IT
-            'layer3.2.relu_2',               # V4/IT
-            'layer3.3.relu_2',               # IT-like
-            'layer3.4.relu_2',
-            'layer3.5.relu_2',               # IT-like
-            'layer4.0.relu_2',
-            'layer4.1.relu_2',               # IT-like
-            'layer4.2.relu_2',
-            'avgpool'
+            'layer1.0.conv3',
+            'layer1.1.conv3',
+            'layer1.0.downsample.0', 
+            'layer2.0.conv3',
+            'layer2.1.conv3',
+            'layer2.2.conv3',
+            'layer2.3.conv3',
+            'layer2.0.downsample.0', 
+            'layer3.0.conv3',
+            'layer3.1.conv3',
+            'layer3.2.conv3',
+            'layer3.3.conv3',
+            'layer3.4.conv3',
+            'layer3.5.conv3',
+            'layer3.0.downsample.0', 
+            'layer4.0.conv3',
+            'layer4.1.conv3',
+            'layer4.2.conv3',
+            'layer4.0.downsample.0', 
         ]
     if model_name == 'vgg16':
         return [
@@ -558,16 +559,57 @@ def get_relevant_output_layers(model_name):
         ]
     if model_name == 'vit_b_16':
         return [
-            'conv_proj',                                      # patch embedding (V1-like)
-            'encoder.layers.encoder_layer_0.add_1',           # early transformer block ← V1
-            'encoder.layers.encoder_layer_2.add_1',           # mid/early block
-            'encoder.layers.encoder_layer_4.add_1',           # mid
-            'encoder.layers.encoder_layer_6.add_1',           # V4-like
-            'encoder.layers.encoder_layer_8.add_1',           # higher block
-            'encoder.layers.encoder_layer_10.add_1',          # deep
-            'encoder.layers.encoder_layer_11.add_1',          # very deep ← IT
-            'encoder.ln',                                     # final transformer output
-            'heads.head'                                      # classification head ← IT
+            'encoder.layers.encoder_layer_0.mlp',
+            'encoder.layers.encoder_layer_1.mlp',
+            'encoder.layers.encoder_layer_2.mlp',
+            'encoder.layers.encoder_layer_3.mlp',
+            'encoder.layers.encoder_layer_4.mlp',
+            'encoder.layers.encoder_layer_5.mlp',
+            'encoder.layers.encoder_layer_6.mlp',
+            'encoder.layers.encoder_layer_7.mlp',
+            'encoder.layers.encoder_layer_8.mlp',           
+            'encoder.layers.encoder_layer_9.mlp',           
+            'encoder.layers.encoder_layer_10.mlp',          
+            'encoder.layers.encoder_layer_11.mlp',          
+            'encoder.layers.encoder_layer_12.mlp',          
+            'encoder.layers.encoder_layer_13.mlp',          
+            'encoder.layers.encoder_layer_14.mlp',          
+            'encoder.layers.encoder_layer_15.mlp',          
+            'encoder.layers.encoder_layer_16.mlp',          
+            'encoder.layers.encoder_layer_17.mlp',          
+            'encoder.layers.encoder_layer_18.mlp',          
+            'encoder.layers.encoder_layer_19.mlp',          
+            'encoder.layers.encoder_layer_20.mlp',          
+            'encoder.layers.encoder_layer_21.mlp',          
+            'encoder.layers.encoder_layer_22.mlp',          
+            'encoder.layers.encoder_layer_23.mlp',          
+        ]
+    if model_name == 'vit_l_16':
+        return [
+            'encoder.layers.encoder_layer_0.mlp',
+            'encoder.layers.encoder_layer_1.mlp',
+            'encoder.layers.encoder_layer_2.mlp',
+            'encoder.layers.encoder_layer_3.mlp',
+            'encoder.layers.encoder_layer_4.mlp',
+            'encoder.layers.encoder_layer_5.mlp',
+            'encoder.layers.encoder_layer_6.mlp',
+            'encoder.layers.encoder_layer_7.mlp',
+            'encoder.layers.encoder_layer_8.mlp',           
+            'encoder.layers.encoder_layer_9.mlp',           
+            'encoder.layers.encoder_layer_10.mlp',          
+            'encoder.layers.encoder_layer_11.mlp',          
+            'encoder.layers.encoder_layer_12.mlp',          
+            'encoder.layers.encoder_layer_13.mlp',          
+            'encoder.layers.encoder_layer_14.mlp',          
+            'encoder.layers.encoder_layer_15.mlp',          
+            'encoder.layers.encoder_layer_16.mlp',          
+            'encoder.layers.encoder_layer_17.mlp',          
+            'encoder.layers.encoder_layer_18.mlp',          
+            'encoder.layers.encoder_layer_19.mlp',          
+            'encoder.layers.encoder_layer_20.mlp',          
+            'encoder.layers.encoder_layer_21.mlp',          
+            'encoder.layers.encoder_layer_22.mlp',          
+            'encoder.layers.encoder_layer_23.mlp',          
         ]
     if 'mobilenet_v3_large' in model_name:
         return ["features.6.block.0", "features.15.block.0", "features.6.block.1", "features.15.block.1", "features.6.block.2", "features.15.block.2", "features.6.block.3", "features.15.block.3", "classifier.0", "classifier.3"]

@@ -1,12 +1,12 @@
 #!/bin/bash
 
 #SBATCH --nodes=1
-#SBATCH --time=1:00:00
-#SBATCH --ntasks=2 # number of processes
+#SBATCH --time=20:00:00
+#SBATCH --ntasks=10 # number of processes
 #SBATCH --cpus-per-task=1
-#SBATCH --mem=20G
+#SBATCH --mem=250G
 #SBATCH --account=livingstone       # account name
-#SBATCH --partition=short # partition name
+#SBATCH --partition=priority # partition name
 #SBATCH --job-name=ipca
 #SBATCH --output=/home/tic569/output_jobs/%x.%j.out   # file name will be *job_name*.*job_id*
 cd /home/tic569/temporal_context/python_scripts/scripts
