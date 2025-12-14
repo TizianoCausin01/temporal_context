@@ -1,6 +1,7 @@
 import sys, os
 import cv2
 import numpy as np
+from torchvision import models
 from scipy.io import loadmat
 sys.path.append("..")
 from general_utils.utils import print_wise, get_upsampling_indices, is_empty
@@ -22,7 +23,7 @@ def read_video(paths, rank, fn, vid_duration=0):
     if vid_duration == 0:
         frames_to_loop = n_frames
     else:
-        frames_to_loop = round(vid_duration * fps)
+        frames_to_loop = min(round(vid_duration * fps), n_frames)
     # end if vid_duration == 0:
     
     video = np.zeros((frames_to_loop, height, width, 3), dtype=np.uint8) # standard [B, H, W, C]
@@ -64,6 +65,7 @@ def load_stimuli_models(paths, model_name, file_names, resolution_Hz):
 
 
 """
+resize_video_array
 Resize a video stored as a NumPy array of shape (n_frames, H, W, C).
 
 INPUT:
@@ -243,3 +245,25 @@ def split_in_batches(frames_per_vid, batch_size):
     for batch_idx in splits:
         batch_size_list.append(len(batch_idx)) # stores the current batch size
     return np.array(batch_size_list) 
+
+def map_anns_names(model_name):
+    if model_name=='alexnet':
+        return 'AlexNet'
+    elif model_name== 'resnet50':
+        return 'ResNet50'    
+    elif model_name== 'resnet18':
+        return 'ResNet18'
+    elif model_name == 'vit_b_16':
+        return 'ViT_B_16'
+    elif model_name == 'vit_l_16':
+        return 'ViT_L_16'
+    elif model_name == 'vgg16':
+        return 'VGG16'
+
+def load_torchvision_model(model_name, device, weights_type='DEFAULT'):
+    model_cls = getattr(models, model_name) # Get the model class
+    weights_name = map_anns_names(model_name)+ '_Weights' # Get the corresponding weights enum, for model_name="alexnet", this gets "AlexNet_Weights"
+    weights_enum = getattr(models, weights_name)    
+    model = model_cls(weights=getattr(weights_enum, weights_type)).to(device).eval() # Load with DEFAULT weights, by default
+    return model
+# EOF
