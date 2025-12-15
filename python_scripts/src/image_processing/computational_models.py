@@ -1,16 +1,18 @@
 import os, yaml, sys
 import numpy as np
 import torch
+import joblib
 import cv2
 import tensorflow.compat.v1 as tf
 from scipy.io import savemat
 from scipy.ndimage import zoom
 from scipy.special import logsumexp
+from torchvision.models.feature_extraction import create_feature_extractor
 sys.path.append("../DeepGaze")
 import deepgaze_pytorch
 
 sys.path.append("..")
-from image_processing.utils import read_video
+from image_processing.utils import read_video, resize_video_array
 from general_utils.utils import print_wise
 
 
@@ -347,3 +349,84 @@ def ICF_loop(video, resize_factor, check_point, new_saver, input_tensor, log_den
      # end for i_frame in range(video.shape[0]):
      video_saliency = np.stack(video_saliency, axis=1)
      return video_saliency
+
+
+"""
+pass_video
+What this function does:
+1. the target video
+2. makes it suitable for the model (i.e. reduces the size to (224, 224, 3) and normalizes)
+3. does the model forward pass
+INPUTS:
+    - paths: dict -> paths to directories
+    - rank: int -> worker id for logging
+    - feature_extractor: torch model -> feature extractor object
+    - layer_name: str -> layer from which to extract features
+    - fn: str -> video filename
+    - device: torch.device -> device to run the model on
+    - max_len: int, optional -> maximum duration of video (in seconds)
+    - new_height: int, optional -> height to resize frames
+    - new_width: int, optional -> width to resize frames
+
+OUTPUT:
+    - feats: np.ndarray -> (frames, features) array of extracted features
+"""
+def pass_video(paths, rank, feature_extractor, layer_name, fn, device, max_len=20, new_height=224, new_width=224):
+    video = read_video(paths, rank, fn, vid_duration=max_len)
+    inputs = resize_video_array(video, new_height, new_width, normalize=True)
+    inputs = torch.from_numpy(inputs).float().to(device)
+    inputs = inputs.permute(0, 3, 1, 2)
+    with torch.no_grad():
+        feats = feature_extractor(inputs)[layer_name]
+        feats = feats.reshape(feats.size(0), -1).cpu().numpy()
+    return feats
+# EOF
+
+
+"""
+compute_torchvision_model
+Processes all videos in a directory through a given model and layer, optionally projects features onto PCA components, and saves the result.
+
+INPUTS:
+    - paths: dict -> paths to directories
+    - rank: int -> worker id for logging
+    - layer_name: str -> layer from which to extract features
+    - model_name: str -> name of the torchvision model
+    - model: torch model -> pretrained model
+    - max_len: int, optional -> maximum duration of video (in seconds)
+    - pca_opt: bool, optional -> whether to project features using precomputed PCA components
+
+SIDE EFFECTS:
+    - Saves feature arrays for each video as compressed .npz files
+    - Prints status messages with worker rank
+"""
+def compute_torchvision_model(paths, rank, layer_name, model_name, model, device, max_len=20, pca_opt=True):
+    feature_extractor = create_feature_extractor(model, return_nodes=[layer_name]).to(device)
+    videos_dir = f"{paths['livingstone_lab']}/Stimuli/Movies/all_videos"
+    models_path = f"{paths['livingstone_lab']}/tiziano/models"
+    all_files = os.listdir(videos_dir) 
+    if pca_opt:
+        ipca_ydx = joblib.load(f"{models_path}/YDX_{model_name}_{layer_name}_ipca_1000_PCs.pkl")
+        ipca_img = joblib.load(f"{models_path}/IMG_{model_name}_{layer_name}_ipca_1000_PCs.pkl")
+        ipca_faceswap = joblib.load(f"{models_path}/faceswap_{model_name}_{layer_name}_ipca_1000_PCs.pkl")
+    # end if pca_opt:
+    for fn in all_files:
+        outfn = f"{models_path}/{model_name}_{layer_name}_{fn[:-4]}.npz"
+        if os.path.exists(outfn):
+            print_wise(f"model already exists at {outfn}", rank=rank)
+        else:
+            if "YDX" in fn:
+                curr_ipca = ipca_ydx     
+            elif "IMG" in fn:
+                curr_ipca = ipca_img
+            else:
+                curr_ipca = ipca_faceswap
+            # end if "YDX" in fn:
+            feats = pass_video(paths, rank, feature_extractor, layer_name, fn, device, max_len=max_len)
+            feats_proj = feats @ curr_ipca.components_.T if pca_opt else feats
+            feats_proj = feats_proj.T
+            np.savez_compressed(outfn, data=feats_proj)
+            print_wise(f"model of size {feats_proj.shape} saved at {outfn}", rank=rank)
+        # end if os.path.exists(outfn):
+    # end for fn in all_files:
+# EOF

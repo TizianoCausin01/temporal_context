@@ -1,3 +1,3 @@
-__all__ = ['get_video_dimensions', 'read_video', 'detect_faces', 'par_detect_faces', 'compute_dg_saliency', 'ICF_setup', 'compute_ICF_saliency', 'load_stimuli_models',] 
-from .utils import get_video_dimensions, read_video, load_stimuli_models
-from .computational_models import detect_faces, make_corners, par_detect_faces, compute_dg_saliency, ICF_setup, compute_ICF_saliency
+__all__ = ['get_video_dimensions', 'read_video', 'detect_faces', 'par_detect_faces', 'compute_dg_saliency', 'ICF_setup', 'compute_ICF_saliency', 'load_stimuli_models', 'resize_video_array', 'shuffle_frames', 'concatenate_frames_batch', 'list_videos', 'get_frames_number', 'split_in_batches','load_torchvision_model', 'compute_torchvision_model'] 
+from .utils import get_video_dimensions, read_video, load_stimuli_models, resize_video_array, shuffle_frames, concatenate_frames_batch, list_videos, get_frames_number, split_in_batches, load_torchvision_model
+from .computational_models import detect_faces, make_corners, par_detect_faces, compute_dg_saliency, ICF_setup, compute_ICF_saliency, compute_torchvision_model

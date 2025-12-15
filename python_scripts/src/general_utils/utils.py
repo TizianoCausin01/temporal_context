@@ -1,6 +1,7 @@
 import sys, os, yaml
 from datetime import datetime
 import numpy as np
+import torch
 import argparse
 from sklearn.metrics.pairwise import pairwise_distances
 from scipy.spatial.distance import pdist
@@ -406,4 +407,211 @@ def multivariate_ou(T, dim, dt, corr_length, sigma=1.0, random_state=None):
         x[t] = A * x[t-1] + noise
 
     return x
+# EOF
+
+
+"""
+Returns True if the list or np.array is empty, False otherwise.
+Works for both lists and NumPy arrays.
+"""
+def is_empty(x):
+    if x is None:
+        return True
+    try:
+        # Works for np.array
+        return x.size == 0
+    except AttributeError:
+        # If no size attribute, fallback to len() (lists, tuples)
+        return len(x) == 0
+# EOF
+
+
+"""
+get_layer_output_shape
+Computes the output shape (excluding batch size) of a specific layer 
+from a given PyTorch feature extractor when applied to a dummy input 
+image of size (1, 3, 224, 224).
+INPUT:
+- feature_extractor: torch.nn.Module -> A PyTorch model (typically a feature extractor created via torchvision.models.feature_extraction.create_feature_extractor)
+                                        which outputs a dictionary of intermediate activations.
+            
+- layer_name: str -> The name of the layer for which the output shape is desired. This must be one of the keys returned by the feature_extractor.
+
+OUTPUT:
+- tmp_shape: Tuple(Int) -> A tuple representing the shape of the output tensor from the specified layer, excluding the batch dimension. For example,
+                          (512, 7, 7) for a convolutional layer or (768,) for a transformer block.
+            
+Example Usage:
+    >>> from torchvision.models import resnet18
+    >>> from torchvision.models.feature_extraction import create_feature_extractor
+    >>> model = resnet18(pretrained=True).eval()
+    >>> feat_ext = create_feature_extractor(model, return_nodes=["layer1.0.relu_1"])
+    >>> shape = get_layer_out_shape(feat_ext, "layer1.0.relu_1")
+    >>> print(shape)
+    (64, 56, 56)
+"""
+def get_layer_output_shape(feature_extractor, layer_name):
+    device = get_device() 
+    with torch.no_grad():
+        in_proxy = torch.randn(1, 3, 224, 224).to(device)
+        tmp_shape = feature_extractor(in_proxy)[layer_name].shape[1:]
+    return tmp_shape
+# EOF 
+
+
+def get_device():
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    return device
+#EOF
+
+
+
+
+"""
+get_relevant_output_layers
+Returns a list of layer names from a specified deep neural network model
+that are approximately aligned with regions in the primate visual cortex
+— namely V1, V4, and IT (inferotemporal cortex). These layers are selected
+to enable brain-model comparisons or neuroscientific analyses of model representations.
+
+INPUT:
+model_name (str): 
+    The name of the model architecture. Supported models include:
+    - 'resnet18'
+    - 'resnet50'
+    - 'vgg16'
+    - 'alexnet'
+    - 'vit_b_16'
+OUTPUT:
+    List[str]: 
+        A list of strings representing layer names in the model. These layers are chosen
+        based on their approximate correspondence to stages in the visual processing hierarchy
+        (e.g., early visual cortex V1, intermediate V4, and higher-level IT).
+
+Example Usage:
+    >>> layers = get_relevant_output_layers('resnet18')
+    >>> print(layers)
+    ['conv1', 'layer1.0.relu_1', 'layer1.1.relu_1', ..., 'avgpool']
+
+    >>> layers = get_relevant_output_layers('vit_b_16')
+    >>> print(layers)
+    ['conv_proj', 'encoder.layers.encoder_layer_0.add_1', ..., 'heads.head']
+"""
+
+def get_relevant_output_layers(model_name):
+    if model_name == 'resnet18':
+        return [
+            'conv1',                         # V1
+            'layer1.0.relu_1',               # V2
+            'layer1.1.relu_1',               # V2/V4
+            'layer2.0.relu_1',               # V4
+            'layer2.1.relu_1',               # V4
+            'layer3.0.relu_1',               # V4/IT
+            'layer3.1.relu_1',               # IT
+            'layer4.0.relu_1',               # IT
+            'layer4.1.relu_1',               # IT
+            'avgpool'                        # pooled features (IT-like)
+        ]
+    if model_name == 'resnet50':
+        return [
+            'layer1.0.conv3',
+            'layer1.1.conv3',
+            'layer1.0.downsample.0', 
+            'layer2.0.conv3',
+            'layer2.1.conv3',
+            'layer2.2.conv3',
+            'layer2.3.conv3',
+            'layer2.0.downsample.0', 
+            'layer3.0.conv3',
+            'layer3.1.conv3',
+            'layer3.2.conv3',
+            'layer3.3.conv3',
+            'layer3.4.conv3',
+            'layer3.5.conv3',
+            'layer3.0.downsample.0', 
+            'layer4.0.conv3',
+            'layer4.1.conv3',
+            'layer4.2.conv3',
+            'layer4.0.downsample.0', 
+        ]
+    if model_name == 'vgg16':
+        return [
+            'features.0',       # conv1_1 (V1)
+            'features.2',       # conv1_2
+            'features.5',       # conv2_2
+            'features.10',      # conv3_3
+            'features.12',      # conv4_1
+            'features.16',      # conv4_3
+            'features.19',      # conv5_1
+            'features.23',      # conv5_3
+            'features.30',      # final conv
+            'classifier.0'      # first FC layer
+        ]
+    if model_name == 'alexnet':
+        return [
+            'features.0',       # conv1
+            'features.4',       # conv2
+            'features.7',       # conv3
+            'features.9',       # conv4
+            'features.11',      # conv5
+            'classifier.2',     # fc6
+            'classifier.5'      # fc7
+        ]
+    if model_name == 'vit_b_16':
+        return [
+            'encoder.layers.encoder_layer_0.mlp',
+            'encoder.layers.encoder_layer_1.mlp',
+            'encoder.layers.encoder_layer_2.mlp',
+            'encoder.layers.encoder_layer_3.mlp',
+            'encoder.layers.encoder_layer_4.mlp',
+            'encoder.layers.encoder_layer_5.mlp',
+            'encoder.layers.encoder_layer_6.mlp',
+            'encoder.layers.encoder_layer_7.mlp',
+            'encoder.layers.encoder_layer_8.mlp',           
+            'encoder.layers.encoder_layer_9.mlp',           
+            'encoder.layers.encoder_layer_10.mlp',          
+            'encoder.layers.encoder_layer_11.mlp',          
+            'encoder.layers.encoder_layer_12.mlp',          
+            'encoder.layers.encoder_layer_13.mlp',          
+            'encoder.layers.encoder_layer_14.mlp',          
+            'encoder.layers.encoder_layer_15.mlp',          
+            'encoder.layers.encoder_layer_16.mlp',          
+            'encoder.layers.encoder_layer_17.mlp',          
+            'encoder.layers.encoder_layer_18.mlp',          
+            'encoder.layers.encoder_layer_19.mlp',          
+            'encoder.layers.encoder_layer_20.mlp',          
+            'encoder.layers.encoder_layer_21.mlp',          
+            'encoder.layers.encoder_layer_22.mlp',          
+            'encoder.layers.encoder_layer_23.mlp',          
+        ]
+    if model_name == 'vit_l_16':
+        return [
+            'encoder.layers.encoder_layer_0.mlp',
+            'encoder.layers.encoder_layer_1.mlp',
+            'encoder.layers.encoder_layer_2.mlp',
+            'encoder.layers.encoder_layer_3.mlp',
+            'encoder.layers.encoder_layer_4.mlp',
+            'encoder.layers.encoder_layer_5.mlp',
+            'encoder.layers.encoder_layer_6.mlp',
+            'encoder.layers.encoder_layer_7.mlp',
+            'encoder.layers.encoder_layer_8.mlp',           
+            'encoder.layers.encoder_layer_9.mlp',           
+            'encoder.layers.encoder_layer_10.mlp',          
+            'encoder.layers.encoder_layer_11.mlp',          
+            'encoder.layers.encoder_layer_12.mlp',          
+            'encoder.layers.encoder_layer_13.mlp',          
+            'encoder.layers.encoder_layer_14.mlp',          
+            'encoder.layers.encoder_layer_15.mlp',          
+            'encoder.layers.encoder_layer_16.mlp',          
+            'encoder.layers.encoder_layer_17.mlp',          
+            'encoder.layers.encoder_layer_18.mlp',          
+            'encoder.layers.encoder_layer_19.mlp',          
+            'encoder.layers.encoder_layer_20.mlp',          
+            'encoder.layers.encoder_layer_21.mlp',          
+            'encoder.layers.encoder_layer_22.mlp',          
+            'encoder.layers.encoder_layer_23.mlp',          
+        ]
+    if 'mobilenet_v3_large' in model_name:
+        return ["features.6.block.0", "features.15.block.0", "features.6.block.1", "features.15.block.1", "features.6.block.2", "features.15.block.2", "features.6.block.3", "features.15.block.3", "classifier.0", "classifier.3"]
+    raise ValueError(f"Model {model_name} not supported in `get_relevant_output_layers()`.")
 # EOF
