@@ -459,12 +459,17 @@ def get_layer_output_shape(feature_extractor, layer_name):
 # EOF 
 
 
+
 def get_device():
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if torch.backends.mps.is_available() and torch.backends.mps.is_built():
+        device = torch.device("mps")
+    elif torch.cuda.is_available():
+        device = torch.device("cuda")
+    else:
+        device = torch.device("cpu")
+    print_wise(f"device being used: {device}")
     return device
-#EOF
-
-
+# EOF
 
 
 """
@@ -497,20 +502,19 @@ Example Usage:
     >>> print(layers)
     ['conv_proj', 'encoder.layers.encoder_layer_0.add_1', ..., 'heads.head']
 """
-
-def get_relevant_output_layers(model_name):
+def get_relevant_output_layers(model_name, pkg='torchvision'):
     if model_name == 'resnet18':
         return [
-            'conv1',                         # V1
-            'layer1.0.relu_1',               # V2
-            'layer1.1.relu_1',               # V2/V4
-            'layer2.0.relu_1',               # V4
-            'layer2.1.relu_1',               # V4
-            'layer3.0.relu_1',               # V4/IT
-            'layer3.1.relu_1',               # IT
-            'layer4.0.relu_1',               # IT
-            'layer4.1.relu_1',               # IT
-            'avgpool'                        # pooled features (IT-like)
+            'conv1',                         
+            'layer1.0.relu_1',               
+            'layer1.1.relu_1',               
+            'layer2.0.relu_1',               
+            'layer2.1.relu_1',               
+            'layer3.0.relu_1',               
+            'layer3.1.relu_1',               
+            'layer4.0.relu_1',               
+            'layer4.1.relu_1',               
+            'avgpool'                        
         ]
     if model_name == 'resnet50':
         return [
@@ -585,33 +589,105 @@ def get_relevant_output_layers(model_name):
             'encoder.layers.encoder_layer_23.mlp',          
         ]
     if model_name == 'vit_l_16':
-        return [
-            'encoder.layers.encoder_layer_0.mlp',
-            'encoder.layers.encoder_layer_1.mlp',
-            'encoder.layers.encoder_layer_2.mlp',
-            'encoder.layers.encoder_layer_3.mlp',
-            'encoder.layers.encoder_layer_4.mlp',
-            'encoder.layers.encoder_layer_5.mlp',
-            'encoder.layers.encoder_layer_6.mlp',
-            'encoder.layers.encoder_layer_7.mlp',
-            'encoder.layers.encoder_layer_8.mlp',           
-            'encoder.layers.encoder_layer_9.mlp',           
-            'encoder.layers.encoder_layer_10.mlp',          
-            'encoder.layers.encoder_layer_11.mlp',          
-            'encoder.layers.encoder_layer_12.mlp',          
-            'encoder.layers.encoder_layer_13.mlp',          
-            'encoder.layers.encoder_layer_14.mlp',          
-            'encoder.layers.encoder_layer_15.mlp',          
-            'encoder.layers.encoder_layer_16.mlp',          
-            'encoder.layers.encoder_layer_17.mlp',          
-            'encoder.layers.encoder_layer_18.mlp',          
-            'encoder.layers.encoder_layer_19.mlp',          
-            'encoder.layers.encoder_layer_20.mlp',          
-            'encoder.layers.encoder_layer_21.mlp',          
-            'encoder.layers.encoder_layer_22.mlp',          
-            'encoder.layers.encoder_layer_23.mlp',          
-        ]
+        if pkg=='torchvision':
+            return [
+                'encoder.layers.encoder_layer_0.mlp',
+                'encoder.layers.encoder_layer_1.mlp',
+                'encoder.layers.encoder_layer_2.mlp',
+                'encoder.layers.encoder_layer_3.mlp',
+                'encoder.layers.encoder_layer_4.mlp',
+                'encoder.layers.encoder_layer_5.mlp',
+                'encoder.layers.encoder_layer_6.mlp',
+                'encoder.layers.encoder_layer_7.mlp',
+                'encoder.layers.encoder_layer_8.mlp',           
+                'encoder.layers.encoder_layer_9.mlp',           
+                'encoder.layers.encoder_layer_10.mlp',          
+                'encoder.layers.encoder_layer_11.mlp',          
+                'encoder.layers.encoder_layer_12.mlp',          
+                'encoder.layers.encoder_layer_13.mlp',          
+                'encoder.layers.encoder_layer_14.mlp',          
+                'encoder.layers.encoder_layer_15.mlp',          
+                'encoder.layers.encoder_layer_16.mlp',          
+                'encoder.layers.encoder_layer_17.mlp',          
+                'encoder.layers.encoder_layer_18.mlp',          
+                'encoder.layers.encoder_layer_19.mlp',          
+                'encoder.layers.encoder_layer_20.mlp',          
+                'encoder.layers.encoder_layer_21.mlp',          
+                'encoder.layers.encoder_layer_22.mlp',          
+                'encoder.layers.encoder_layer_23.mlp',          
+            ]
+        elif pkg=='timm':
+            return [
+                'blocks.0.mlp.fc2',
+                'blocks.1.mlp.fc2',
+                'blocks.2.mlp.fc2',
+                'blocks.3.mlp.fc2',
+                'blocks.4.mlp.fc2',
+                'blocks.5.mlp.fc2',
+                'blocks.6.mlp.fc2',
+                'blocks.7.mlp.fc2',
+                'blocks.8.mlp.fc2',
+                'blocks.9.mlp.fc2',
+                'blocks.10.mlp.fc2',
+                'blocks.11.mlp.fc2',
+                'blocks.12.mlp.fc2',
+                'blocks.13.mlp.fc2',
+                'blocks.14.mlp.fc2',
+                'blocks.15.mlp.fc2',
+                'blocks.16.mlp.fc2',
+                'blocks.17.mlp.fc2',
+                'blocks.18.mlp.fc2',
+                'blocks.19.mlp.fc2',
+                'blocks.20.mlp.fc2',
+                'blocks.21.mlp.fc2',
+                'blocks.22.mlp.fc2',
+                'blocks.23.mlp.fc2',
+                   ]
+
     if 'mobilenet_v3_large' in model_name:
         return ["features.6.block.0", "features.15.block.0", "features.6.block.1", "features.15.block.1", "features.6.block.2", "features.15.block.2", "features.6.block.3", "features.15.block.3", "classifier.0", "classifier.3"]
     raise ValueError(f"Model {model_name} not supported in `get_relevant_output_layers()`.")
 # EOF
+
+
+"""
+subsample_RDM
+Starting from a full RDM, it extracts a smaller RDM using a subset of indices.
+1) Selects the rows corresponding to the provided indices
+2) Selects the matching columns (same indices)
+3) Preserves the pairwise structure of the original RDM
+
+INPUT:
+- RDM: np.ndarray (N, N) -> full square representational dissimilarity matrix
+- indices: array-like (K,) -> indices of conditions/items to keep
+
+OUTPUT:
+- subsampled_RDM: np.ndarray (K, K) -> sub-RDM restricted to the selected indices
+"""
+def subsample_RDM(RDM, indices):
+    subsampled_RDM = RDM[np.ix_(indices, indices)]
+    return subsampled_RDM
+# EOF
+
+
+"""
+decode_matlab_strings
+Decodes MATLAB strings stored in a v7.3 .mat file (HDF5 format) into Python strings.
+1) Iterates over HDF5 object references pointing to MATLAB char arrays
+2) Reads the corresponding uint16 character codes
+3) Converts character codes to Python characters and joins them into strings
+
+INPUT:
+- h5file: h5py.File -> open HDF5 file corresponding to a MATLAB v7.3 .mat file
+- ref_array: np.ndarray -> array of HDF5 object references to MATLAB char arrays
+
+OUTPUT:
+- strings: list of str -> decoded MATLAB strings
+"""
+def decode_matlab_strings(h5file, ref_array):
+    strings = []
+    for ref in ref_array.squeeze():
+        chars = h5file[ref][:]
+        s = ''.join(chr(c) for c in chars.flatten()) # MATLAB chars are usually stored as Nx1 uint16
+        strings.append(s)
+    return strings

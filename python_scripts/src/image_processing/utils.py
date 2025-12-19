@@ -1,7 +1,8 @@
 import sys, os
 import cv2
 import numpy as np
-from torchvision import models
+from torchvision import models, transforms
+import timm
 from scipy.io import loadmat
 sys.path.append("..")
 from general_utils.utils import print_wise, get_upsampling_indices, is_empty
@@ -246,7 +247,7 @@ def split_in_batches(frames_per_vid, batch_size):
         batch_size_list.append(len(batch_idx)) # stores the current batch size
     return np.array(batch_size_list) 
 
-def map_anns_names(model_name):
+def map_anns_names(model_name, pkg='torchvision'):
     if model_name=='alexnet':
         return 'AlexNet'
     elif model_name== 'resnet50':
@@ -256,7 +257,11 @@ def map_anns_names(model_name):
     elif model_name == 'vit_b_16':
         return 'ViT_B_16'
     elif model_name == 'vit_l_16':
-        return 'ViT_L_16'
+        if pkg=='torchvision':
+            return 'ViT_L_16'
+        elif pkg=='timm':
+            return 'vit_large_patch16'
+        # end if pkg=='torchvision':
     elif model_name == 'vgg16':
         return 'VGG16'
 
@@ -267,3 +272,50 @@ def load_torchvision_model(model_name, device, weights_type='DEFAULT'):
     model = model_cls(weights=getattr(weights_enum, weights_type)).to(device).eval() # Load with DEFAULT weights, by default
     return model
 # EOF
+
+
+def load_timm_model(model_name, img_size, device):
+    final_name = f"{map_anns_names(model_name, pkg='timm')}_{img_size}" 
+    model = timm.create_model(final_name, pretrained=True).to(device)
+    return model
+# EOF
+
+"""
+get_usual_transform
+Returns a standard preprocessing pipeline commonly used for 
+pretrained convolutional neural networks (e.g., ResNet, AlexNet) 
+trained on ImageNet. This includes resizing, cropping, conversion 
+to tensor, and normalization.
+
+Inputs:
+    None
+
+Outputs:
+    transform (torchvision.transforms.Compose):
+        A composition of torchvision transforms to apply to input images.
+        The transformations include:
+            - Resize to 256 pixels (shorter side)
+            - Center crop to 224x224 pixels
+            - Convert to PyTorch tensor (values in [0,1])
+            - Normalize using ImageNet mean and std:
+                mean = [0.485, 0.456, 0.406]
+                std  = [0.229, 0.224, 0.225]
+
+Example usage:
+    transform = get_usual_transform()
+    image = PIL.Image.open("example.jpg")
+    input_tensor = transform(image)
+"""
+def get_usual_transform(resize_size=224, center_crop_size=None, normalize=True):
+    transform_list = [transforms.Resize((resize_size, resize_size))]
+    if center_crop_size is not None:
+        transform_list.append(transforms.CenterCrop(center_crop_size))
+    # end if center_crop_size is not None:
+    transform_list.append(transforms.ToTensor())
+    if normalize:
+        transform_list.append(transforms.Normalize(mean=[0.485, 0.456, 0.406],std=[0.229, 0.224, 0.225]))
+
+    # end if normalize:
+    transform = transforms.Compose(transform_list)
+    return transform
+

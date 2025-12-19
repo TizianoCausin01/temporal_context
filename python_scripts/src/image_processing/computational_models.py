@@ -2,18 +2,20 @@ import os, yaml, sys
 import numpy as np
 import torch
 import joblib
+import h5py
 import cv2
 import tensorflow.compat.v1 as tf
 from scipy.io import savemat
 from scipy.ndimage import zoom
 from scipy.special import logsumexp
 from torchvision.models.feature_extraction import create_feature_extractor
+from sklearn.decomposition import PCA
 sys.path.append("../DeepGaze")
 import deepgaze_pytorch
 
 sys.path.append("..")
 from image_processing.utils import read_video, resize_video_array
-from general_utils.utils import print_wise
+from general_utils.utils import print_wise, decode_matlab_strings
 
 
 """
@@ -429,4 +431,128 @@ def compute_torchvision_model(paths, rank, layer_name, model_name, model, device
             print_wise(f"model of size {feats_proj.shape} saved at {outfn}", rank=rank)
         # end if os.path.exists(outfn):
     # end for fn in all_files:
+# EOF
+
+
+"""
+img_dataloader_feature_extraction_loop
+Iterates over an image DataLoader and extracts features from a given model layer.
+
+What this function does:
+1) Iterates over batches of images from a PyTorch DataLoader
+2) Performs a forward pass through a feature extractor
+3) Flattens and stores the features batch by batch
+4) Concatenates all features into a single array
+
+INPUT:
+- rank: int -> process rank (used for controlled printing)
+- feature_extractor: torch.nn.Module -> model wrapped with create_feature_extractor
+- dataloader: torch.utils.data.DataLoader -> image dataloader
+
+OUTPUT:
+- all_feats: np.ndarray (n_images, n_features) -> extracted features
+"""
+def img_dataloader_feature_extraction_loop(rank, feature_extractor, layer_name, dataloader, device):
+    all_feats = []
+    with torch.no_grad():
+        for batch_idx, (images, labels) in enumerate(dataloader):
+            feats =feature_extractor(images.to(device))[layer_name]
+            feats = feats.reshape(feats.size(0), -1).cpu().numpy()
+            all_feats.append(feats)
+            print_wise(f"loaded batch {batch_idx} of shape {feats.shape}", rank=rank)
+    all_feats = np.concatenate(all_feats, axis=0)
+    return all_feats
+# EOF
+
+"""
+img_feats_extraction
+Computes and stores image features, PCA, and RDM for a given model layer.
+
+What this function does:
+1) Checks whether PCA, features, and RDM files already exist
+2) Extracts image features from the specified model layer
+3) Reorders features to match monkey presentation order
+4) Computes the RDM from full features
+5) Fits PCA and saves explained variance ratios
+6) Projects features onto PCA space and saves them
+
+INPUT:
+- paths: dict -> dictionary with base paths
+- rank: int -> process rank
+- layer_name: str -> model layer used for feature extraction
+- model_name: str -> name of the model
+- model: torch.nn.Module -> pretrained ANN
+- dataloader: DataLoader -> image dataloader
+- mapping_idx: list[int] -> index mapping from ANN order to monkey order
+- monkey_name: str -> monkey identifier
+- date: str -> experiment date
+- n_components: int -> number of PCA components
+- device: torch.device -> cpu / cuda / mps
+
+OUTPUT:
+- None
+(Saves PCA explained variance, projected features, and RDM to disk)
+"""
+def img_feats_extraction(paths, rank, layer_name, model_name, model, dataloader, mapping_idx, monkey_name, date, n_components, device):
+    pca_save_name = f"{paths['livingstone_lab']}/tiziano/models/{monkey_name}_{date}_{model_name}_{layer_name}_{n_components}PCs.npz"
+    feats_save_name = f"{paths['livingstone_lab']}/tiziano/models/{monkey_name}_{date}_{model_name}_{layer_name}_features.npz"
+    RDM_save_name = f"{paths['livingstone_lab']}/tiziano/models/{monkey_name}_{date}_{model_name}_{layer_name}_RDM.npz"
+    paths_exist = all([
+        os.path.exists(pca_save_name),
+        os.path.exists(feats_save_name),
+        os.path.exists(RDM_save_name),
+    ])
+    if paths_exist:
+        print_wise(f"feature already computed at {feats_save_name}")
+    else:
+        feature_extractor = create_feature_extractor(model, return_nodes=[layer_name]).to(device)
+        all_feats = img_dataloader_feature_extraction_loop(rank, feature_extractor, layer_name, dataloader, device)
+        all_feats = all_feats[mapping_idx, :]
+        RDM_vec = create_RDM(all_feats.T)
+        np.savez_compressed(RDM_save_name, RDM_vec)
+        print_wise(f"saved RDM at {RDM_save_name}", rank=rank)
+        pca = PCA(n_components=n_components)
+        pca.fit(all_feats)
+        np.savez_compressed(pca_save_name, pca.explained_variance_ratio_)
+        print_wise(f"saved pca explained ratio at {pca_save_name}", rank=rank)
+        #joblib.dump(pca, pca_save_name)
+        all_feats_redu = pca.transform(all_feats)
+        np.savez_compressed(feats_save_name, all_feats_redu.T)
+        print_wise(f"saved features at {feats_save_name}", rank=rank)
+# EOF
+
+
+"""
+map_image_order_from_ann_to_monkey
+Creates an index mapping to align ANN image order with monkey presentation order.
+
+What this function does:
+1) Loads the list of images presented to the monkey from a MATLAB file
+2) Decodes MATLAB string references into Python strings
+3) Removes duplicate image names while preserving order
+4) Extracts the ANN image presentation order from the dataset
+5) Computes the index mapping from monkey order to ANN order
+
+INPUT:
+- paths: dict -> dictionary with base paths
+- monkey_name: str -> monkey identifier
+- date: str -> experiment date
+- dataset: torchvision.datasets.ImageFolder -> ANN image dataset
+
+OUTPUT:
+- mapping_idx: list[int] -> indices to reorder ANN features to monkey order
+"""
+def map_image_order_from_ann_to_monkey(paths, monkey_name, date, dataset):
+    allimgs_path = f"{paths['livingstone_lab']}/tiziano/data/{monkey_name}_allimages{date}.mat"
+    with h5py.File(allimgs_path, "r") as f:
+        try:
+            refs = f["allimages"][:]      # shape (N, 1) of object refs
+        except KeyError:
+            refs = f["uniqueImage"][:]
+        # end try:
+        monkey_presentation_order = decode_matlab_strings(f, refs)
+        monkey_presentation_order = list(dict.fromkeys(monkey_presentation_order)) # keeps only one example 
+    ann_presentation_order = [os.path.basename(path) for path, _ in dataset.samples] # creates the order with which images are presented to the ANN
+    mapping_idx = [ann_presentation_order.index(x) for x in monkey_presentation_order] # Creates a mapping from the monkey to the ann presentation order
+    return mapping_idx # by applying this to the ann features we'll get the same order as the monkeys'
 # EOF
