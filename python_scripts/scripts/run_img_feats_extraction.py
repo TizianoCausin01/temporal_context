@@ -27,6 +27,8 @@ if __name__ == "__main__":
     parser.add_argument("--monkey_name", type=str)
     parser.add_argument("--date", type=str)
     parser.add_argument("--folder_name", type=str)
+    parser.add_argument("--pkg", type=str)
+    
     args = parser.parse_args()
 
     device = get_device()
@@ -41,9 +43,9 @@ if __name__ == "__main__":
     )
     mapping_idx = map_image_order_from_ann_to_monkey(paths, args.monkey_name, args.date, dataset)
     dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=False)
-    if pkg=='torchvision':
+    if args.pkg=='torchvision':
         load_mod_function = load_torchvision_model
-    elif pkg=='timm':
+    elif args.pkg=='timm':
         load_mod_function = load_timm_model
     model = load_mod_function(args.model_name, device, img_size=args.img_size)
     master_workers_queue(task_list, paths, img_feats_extraction, *(args.model_name, model, dataloader, mapping_idx, args.monkey_name, args.date, args.num_components, device)) 
