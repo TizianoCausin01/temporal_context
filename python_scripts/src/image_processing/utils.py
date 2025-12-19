@@ -265,7 +265,7 @@ def map_anns_names(model_name, pkg='torchvision'):
     elif model_name == 'vgg16':
         return 'VGG16'
 
-def load_torchvision_model(model_name, device, weights_type='DEFAULT'):
+def load_torchvision_model(model_name, device, img_size=224, weights_type='DEFAULT'):
     model_cls = getattr(models, model_name) # Get the model class
     weights_name = map_anns_names(model_name)+ '_Weights' # Get the corresponding weights enum, for model_name="alexnet", this gets "AlexNet_Weights"
     weights_enum = getattr(models, weights_name)    
@@ -274,7 +274,7 @@ def load_torchvision_model(model_name, device, weights_type='DEFAULT'):
 # EOF
 
 
-def load_timm_model(model_name, img_size, device):
+def load_timm_model(model_name, device, img_size=384):
     final_name = f"{map_anns_names(model_name, pkg='timm')}_{img_size}" 
     model = timm.create_model(final_name, pretrained=True).to(device)
     return model
