@@ -13,7 +13,7 @@ with open("../../config.yaml", "r") as f:
 paths = config[ENV]["paths"]
 sys.path.append(paths["src_path"])
 from general_utils.utils import get_relevant_output_layers, get_device
-from image_processing.utils import load_timm_model, get_usual_transform
+from image_processing.utils import load_timm_model, load_torchvision_model, get_usual_transform
 from image_processing.computational_models import img_feats_extraction, map_image_order_from_ann_to_monkey
 from parallel.parallel_funcs import master_workers_queue
 
@@ -31,7 +31,7 @@ if __name__ == "__main__":
 
     device = get_device()
     transform = get_usual_transform(resize_size=args.img_size, normalize=True)
-    task_list = get_relevant_output_layers(args.model_name, pkg='timm')
+    task_list = get_relevant_output_layers(args.model_name, pkg=args.pkg)
 
     dataset = ImageFolder(
         root=f"{paths['livingstone_lab']}/Stimuli/{args.folder_name}/",
@@ -41,5 +41,9 @@ if __name__ == "__main__":
     )
     mapping_idx = map_image_order_from_ann_to_monkey(paths, args.monkey_name, args.date, dataset)
     dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=False)
-    model = load_timm_model(args.model_name, args.img_size, device)
+    if pkg=='torchvision':
+        load_mod_function = load_torchvision_model
+    elif pkg=='timm':
+        load_mod_function = load_timm_model
+    model = load_mod_function(args.model_name, device, img_size=args.img_size)
     master_workers_queue(task_list, paths, img_feats_extraction, *(args.model_name, model, dataloader, mapping_idx, args.monkey_name, args.date, args.num_components, device)) 
