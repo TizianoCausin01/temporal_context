@@ -15,7 +15,7 @@ import deepgaze_pytorch
 
 sys.path.append("..")
 from image_processing.utils import read_video, resize_video_array
-from general_utils.utils import print_wise, decode_matlab_strings
+from general_utils.utils import print_wise, decode_matlab_strings, create_RDM
 
 
 """
@@ -493,10 +493,10 @@ OUTPUT:
 - None
 (Saves PCA explained variance, projected features, and RDM to disk)
 """
-def img_feats_extraction(paths, rank, layer_name, model_name, model, dataloader, mapping_idx, monkey_name, date, n_components, device):
-    pca_save_name = f"{paths['livingstone_lab']}/tiziano/models/{monkey_name}_{date}_{model_name}_{layer_name}_{n_components}PCs.npz"
-    feats_save_name = f"{paths['livingstone_lab']}/tiziano/models/{monkey_name}_{date}_{model_name}_{layer_name}_features.npz"
-    RDM_save_name = f"{paths['livingstone_lab']}/tiziano/models/{monkey_name}_{date}_{model_name}_{layer_name}_RDM.npz"
+def img_feats_extraction(paths, rank, layer_name, model_name, model, dataloader, mapping_idx, monkey_name, date, img_size, n_components, device):
+    pca_save_name = f"{paths['livingstone_lab']}/tiziano/models/{monkey_name}_{date}_{model_name}_{img_size}_{layer_name}_{n_components}PCs.pkl"
+    feats_save_name = f"{paths['livingstone_lab']}/tiziano/models/{monkey_name}_{date}_{model_name}_{img_size}_{layer_name}_features.npz"
+    RDM_save_name = f"{paths['livingstone_lab']}/tiziano/models/{monkey_name}_{date}_{model_name}_{img_size}_{layer_name}_RDM.npz"
     paths_exist = all([
         os.path.exists(pca_save_name),
         os.path.exists(feats_save_name),
@@ -513,7 +513,8 @@ def img_feats_extraction(paths, rank, layer_name, model_name, model, dataloader,
         print_wise(f"saved RDM at {RDM_save_name}", rank=rank)
         pca = PCA(n_components=n_components)
         pca.fit(all_feats)
-        np.savez_compressed(pca_save_name, pca.explained_variance_ratio_)
+        #np.savez_compressed(pca_save_name, pca.explained_variance_ratio_)
+        joblib.dump(pca, pca_save_name)
         print_wise(f"saved pca explained ratio at {pca_save_name}", rank=rank)
         #joblib.dump(pca, pca_save_name)
         all_feats_redu = pca.transform(all_feats)
@@ -554,5 +555,7 @@ def map_image_order_from_ann_to_monkey(paths, monkey_name, date, dataset):
         monkey_presentation_order = list(dict.fromkeys(monkey_presentation_order)) # keeps only one example 
     ann_presentation_order = [os.path.basename(path) for path, _ in dataset.samples] # creates the order with which images are presented to the ANN
     mapping_idx = [ann_presentation_order.index(x) for x in monkey_presentation_order] # Creates a mapping from the monkey to the ann presentation order
+    newly_ordered_ann = [ann_presentation_order[i] for i in mapping_idx]
+    assert newly_ordered_ann == monkey_presentation_order
     return mapping_idx # by applying this to the ann features we'll get the same order as the monkeys'
 # EOF

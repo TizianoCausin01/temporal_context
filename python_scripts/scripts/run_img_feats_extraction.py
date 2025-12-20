@@ -32,7 +32,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     device = get_device()
-    transform = get_usual_transform(resize_size=args.img_size, normalize=True)
+    transform = get_usual_transform(resize_size=args.img_size, normalize=False)
     task_list = get_relevant_output_layers(args.model_name, pkg=args.pkg)
 
     dataset = ImageFolder(
@@ -48,4 +48,4 @@ if __name__ == "__main__":
     elif args.pkg=='timm':
         load_mod_function = load_timm_model
     model = load_mod_function(args.model_name, device, img_size=args.img_size)
-    master_workers_queue(task_list, paths, img_feats_extraction, *(args.model_name, model, dataloader, mapping_idx, args.monkey_name, args.date, args.num_components, device)) 
+    master_workers_queue(task_list, paths, img_feats_extraction, *(args.model_name, model, dataloader, mapping_idx, args.monkey_name, args.date, args.img_size, args.num_components, device)) 
