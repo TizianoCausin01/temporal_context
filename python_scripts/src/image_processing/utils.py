@@ -325,7 +325,7 @@ def pool_features(features, pooling):
     if pooling == 'all':
         return features
     if len(dimensions) == 4: # CNNs case
-        pooled_features = reduce(features, 'batch_size chan h w -> batch_size chan', 'mean')
+        pooled_features = reduce(features, 'batch_size chan h w -> batch_size chan', pooling)
     elif len(dimensions) == 3: # the ViT case
         pooled_features = reduce(features, 'batch_size tokens emb_dim -> batch_size emb_dim', pooling)
     elif len(dimensions) == 2: # classifier layers, don't apply pooling
