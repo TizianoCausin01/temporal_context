@@ -4,6 +4,7 @@ import numpy as np
 from torchvision import models, transforms
 import timm
 from scipy.io import loadmat
+from einops import reduce
 sys.path.append("..")
 from general_utils.utils import print_wise, get_upsampling_indices, is_empty
 
@@ -319,3 +320,15 @@ def get_usual_transform(resize_size=224, center_crop_size=None, normalize=True):
     transform = transforms.Compose(transform_list)
     return transform
 
+def pool_features(features, pooling):
+    dimensions = features.shape
+    if pooling == 'all':
+        return features
+    if len(dimensions) == 4: # CNNs case
+        pooled_features = reduce(features, 'batch_size chan h w -> batch_size chan', 'mean')
+    elif len(dimensions) == 3: # the ViT case
+        pooled_features = reduce(features, 'batch_size tokens emb_dim -> batch_size emb_dim', pooling)
+    elif len(dimensions) == 2: # classifier layers, don't apply pooling
+        pooled_features = features
+    # end
+    return pooled_features

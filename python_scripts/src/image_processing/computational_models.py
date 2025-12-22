@@ -14,7 +14,7 @@ sys.path.append("../DeepGaze")
 import deepgaze_pytorch
 
 sys.path.append("..")
-from image_processing.utils import read_video, resize_video_array
+from image_processing.utils import read_video, resize_video_array, pool_features
 from general_utils.utils import print_wise, decode_matlab_strings, create_RDM
 
 
@@ -452,11 +452,12 @@ INPUT:
 OUTPUT:
 - all_feats: np.ndarray (n_images, n_features) -> extracted features
 """
-def img_dataloader_feature_extraction_loop(rank, feature_extractor, layer_name, dataloader, device):
+def img_dataloader_feature_extraction_loop(rank, feature_extractor, layer_name, dataloader, pooling='all', device):
     all_feats = []
     with torch.no_grad():
         for batch_idx, (images, labels) in enumerate(dataloader):
             feats =feature_extractor(images.to(device))[layer_name]
+            feats = pool_features(feats, pooling)
             feats = feats.reshape(feats.size(0), -1).cpu().numpy()
             all_feats.append(feats)
             print_wise(f"loaded batch {batch_idx} of shape {feats.shape}", rank=rank)
@@ -523,6 +524,29 @@ def img_feats_extraction(paths, rank, layer_name, model_name, model, dataloader,
 # EOF
 
 
+
+def img_feats_extraction_pooling(paths, rank, layer_name, model_name, model, dataloader, mapping_idx, monkey_name, date, img_size, n_components, pooling, device):
+    feats_save_name = f"{paths['livingstone_lab']}/tiziano/models/{monkey_name}_{date}_{model_name}_{img_size}_{layer_name}_features_{pooling}pool.npz"
+    RDM_save_name = f"{paths['livingstone_lab']}/tiziano/models/{monkey_name}_{date}_{model_name}_{img_size}_{layer_name}_RDM_{pooling}pool.npz"
+    paths_exist = all([
+        os.path.exists(feats_save_name),
+        os.path.exists(RDM_save_name),
+    ])
+    if paths_exist:
+        print_wise(f"feature already computed at {feats_save_name}")
+    else:
+        feature_extractor = create_feature_extractor(model, return_nodes=[layer_name]).to(device)
+        all_feats = img_dataloader_feature_extraction_loop(rank, feature_extractor, layer_name, dataloader, device, pooling=pooling)
+        all_feats = all_feats[mapping_idx, :]
+        RDM_vec = create_RDM(all_feats.T)
+        np.savez_compressed(RDM_save_name, RDM_vec)
+        print_wise(f"saved RDM at {RDM_save_name}", rank=rank)
+        np.savez_compressed(feats_save_name, all_feats)
+        print_wise(f"saved features at {feats_save_name}", rank=rank)
+# EOF
+
+
+
 """
 map_image_order_from_ann_to_monkey
 Creates an index mapping to align ANN image order with monkey presentation order.
@@ -552,7 +576,7 @@ def map_image_order_from_ann_to_monkey(paths, monkey_name, date, dataset):
             refs = f["uniqueImage"][:]
         # end try:
         monkey_presentation_order = decode_matlab_strings(f, refs)
-        monkey_presentation_order = list(dict.fromkeys(monkey_presentation_order)) # keeps only one example 
+        monkey_presentation_order = sorted(set(monkey_presentation_order))
     ann_presentation_order = [os.path.basename(path) for path, _ in dataset.samples] # creates the order with which images are presented to the ANN
     mapping_idx = [ann_presentation_order.index(x) for x in monkey_presentation_order] # Creates a mapping from the monkey to the ann presentation order
     newly_ordered_ann = [ann_presentation_order[i] for i in mapping_idx]
