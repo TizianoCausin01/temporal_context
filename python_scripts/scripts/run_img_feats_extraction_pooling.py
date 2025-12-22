@@ -14,7 +14,7 @@ paths = config[ENV]["paths"]
 sys.path.append(paths["src_path"])
 from general_utils.utils import get_relevant_output_layers, get_device
 from image_processing.utils import load_timm_model, load_torchvision_model, get_usual_transform
-from image_processing.computational_models import img_feats_extraction, map_image_order_from_ann_to_monkey
+from image_processing.computational_models import img_feats_extraction_pooling, map_image_order_from_ann_to_monkey
 from parallel.parallel_funcs import master_workers_queue
 
 
@@ -50,4 +50,4 @@ if __name__ == "__main__":
     elif args.pkg=='timm':
         load_mod_function = load_timm_model
     model = load_mod_function(args.model_name, device, img_size=args.img_size)
-    master_workers_queue(task_list, paths, img_feats_extraction, *(args.model_name, model, dataloader, mapping_idx, args.monkey_name, args.date, args.img_size, args.num_components, args.pooling, device)) 
+    master_workers_queue(task_list, paths, img_feats_extraction_pooling, *(args.model_name, model, dataloader, mapping_idx, args.monkey_name, args.date, args.img_size, args.num_components, args.pooling, device)) 

@@ -452,7 +452,7 @@ INPUT:
 OUTPUT:
 - all_feats: np.ndarray (n_images, n_features) -> extracted features
 """
-def img_dataloader_feature_extraction_loop(rank, feature_extractor, layer_name, dataloader, pooling='all', device):
+def img_dataloader_feature_extraction_loop(rank, feature_extractor, layer_name, dataloader, device, pooling='all'):
     all_feats = []
     with torch.no_grad():
         for batch_idx, (images, labels) in enumerate(dataloader):
