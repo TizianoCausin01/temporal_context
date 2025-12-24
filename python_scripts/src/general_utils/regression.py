@@ -229,4 +229,22 @@ def lagged_linear_regression(x, y, regression_type='lr', alpha=0.0, cv_type='sam
     return lr_list
 # EOF
 
-
+def static_lagged_linear_regression(x, y, regression_type='lr', alpha=0.0, cv_type='same', n_splits=5, shuffle=True):
+    lr_list = []
+    x_shifted_tot = x.T
+    for tau in range(y.shape[1]):
+        y_shifted_tot = y[:,tau,:].T
+        CV = choose_CV_type(cv_type, n_splits=n_splits, shuffle=shuffle)
+        curr_lr = []
+        for train_idx, test_idx in CV.split(x_shifted_tot):
+            train_x, train_y = x_shifted_tot[train_idx, :], y_shifted_tot[train_idx, :]
+            test_x, test_y = x_shifted_tot[test_idx, :], y_shifted_tot[test_idx, :]
+            regression_obj = choose_regression_type(regression_type=regression_type, alpha=alpha)
+            regression_obj = regression_obj.fit(train_x, train_y)
+            avg_corr = evaluate_prediction(test_x, test_y, regression_obj)
+            curr_lr.append(avg_corr)
+        # end for train_idx, test_idx in CV.split(x_shifted_tot):
+        lr_list.append(np.nanmean(curr_lr))  #x_t_shifted_tot, y_t_shifted_tot))
+    # end for L in range(-max_lag, max_lag):    
+    return lr_list
+# EOF

@@ -450,10 +450,10 @@ Example Usage:
     >>> print(shape)
     (64, 56, 56)
 """
-def get_layer_output_shape(feature_extractor, layer_name):
+def get_layer_output_shape(feature_extractor, layer_name, imsize=224):
     device = get_device() 
     with torch.no_grad():
-        in_proxy = torch.randn(1, 3, 224, 224).to(device)
+        in_proxy = torch.randn(1, 3, imsize, imsize).to(device)
         tmp_shape = feature_extractor(in_proxy)[layer_name].shape[1:]
     return tmp_shape
 # EOF 

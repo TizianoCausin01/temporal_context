@@ -541,7 +541,7 @@ def img_feats_extraction_pooling(paths, rank, layer_name, model_name, model, dat
         RDM_vec = create_RDM(all_feats.T)
         np.savez_compressed(RDM_save_name, RDM_vec)
         print_wise(f"saved RDM at {RDM_save_name}", rank=rank)
-        np.savez_compressed(feats_save_name, all_feats)
+        np.savez_compressed(feats_save_name, all_feats.T)
         print_wise(f"saved features at {feats_save_name}", rank=rank)
 # EOF
 
