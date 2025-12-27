@@ -60,7 +60,7 @@ def format_in_trials(paths, file_list, len_avg_window, foreperiod_len, rasters, 
 create_bins
 Creates the bins for computing the firing rate by defining a range with a certain step and converting to int (because we assume the resolution of the signal is at 1000Hz.
 INPUT:
-    - trial_duration: int -> the duration of the trial
+    - trial_duration: int -> the duration of the trial in samples (i.e. assuming fs=1000Hz)
     - len_avg_window: np.float -> how much we want to average out our 1000Hz neural and eye-tracking signals
 OUTPUT:
     - bins: np.ndarray -> the onsets of each bin to average in get_firing_rate

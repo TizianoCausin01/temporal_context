@@ -691,3 +691,4 @@ def decode_matlab_strings(h5file, ref_array):
         s = ''.join(chr(c) for c in chars.flatten()) # MATLAB chars are usually stored as Nx1 uint16
         strings.append(s)
     return strings
+
