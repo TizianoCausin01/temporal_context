@@ -8,7 +8,7 @@ from scipy.spatial.distance import pdist
 from scipy.spatial import cKDTree
 from sklearn.model_selection import KFold
 from sklearn.metrics import accuracy_score 
-
+from numba import njit
 
 def print_wise(mex, rank=None):
     if rank == None:
@@ -114,8 +114,9 @@ def create_RDM(data, metric='correlation'):
     # end if data.shape[1] == 1:
     if metric == 'correlation':
         RDM = 1 - np.corrcoef(data, rowvar=False)
-        rows, cols = np.triu_indices(RDM.shape[0], k=1)
-        RDM_vec = RDM[rows, cols]
+        RDM_vec = index_gram(RDM)
+    elif metric == 'cosine':
+        RDM_vec = cosine_sim(data)
     else:
         RDM_vec = pdist(data.T, metric=metric)
     # end if metric == 'pearson':
@@ -692,3 +693,45 @@ def decode_matlab_strings(h5file, ref_array):
         strings.append(s)
     return strings
 
+
+"""
+index_gram
+Indexes the upper-triangular elements of a Gram matrix in the same way pdist would do.
+INPUT:
+    - gram: np.ndarray(n, n) -> the Gram matrix
+OUTPUT:
+    - gram: np.ndarray(n(n-1)/2) -> vectorized upper-triangular gram 
+"""
+@njit
+def index_gram(gram):
+    n = gram.shape[0]
+    n_pairs = n * (n - 1) // 2
+    gram_vec = np.empty(n_pairs)
+    counter = 0
+    for i in range(n):
+        for j in range(i+1, n):
+            gram_vec[counter] = gram[i, j]
+            counter += 1
+    return gram_vec
+# EOF
+
+
+"""
+cosine_sim
+Computes the cosine dissimilarity (1-cosine_sim).
+First it normalizes all the columns of x (axis=0), then it computes the dot-product gram.
+It uses the fact that cos(theta) = dot(u,v)/(|u||v|) .
+INPUT:
+    - x: np.ndarray (d, n) -> data matrix of shape (features, points)
+OUTPUT:
+    - gram: np.ndarray(n(n-1)/2) -> vectorized upper-triangular gram with cosine similarity as distance metric
+"""
+@njit
+def cosine_sim(x):
+    norm = np.sqrt(np.sum(x**2, axis=0))
+    x = x/norm
+    gram = x.T @ x 
+    gram = 1- gram
+    gram = index_gram(gram)
+    return gram
+# EOF
