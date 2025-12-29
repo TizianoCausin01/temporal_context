@@ -859,7 +859,37 @@ class BrainAreas:
     # EOF
 # EOC
 
+"""
+TimeSeries
+Container for multivariate neural time series data with flexible internal
+representation (NumPy array or list of arrays).
 
+Supports iteration over time points, temporal resampling, averaging across
+dimensions, and autocorrelation-based analyses.
+
+INTERNAL REPRESENTATION:
+- type = "np"   : array shape (neurons, time, trials, ...)
+- type = "list" : list of arrays, each array shape (neurons, trials, ...)
+
+INPUT:
+- array : np.ndarray (features, timepts [, trials]) | list[np.ndarray(feats [, trials])] 
+    Neural data. Either a NumPy array with explicit time axis or a list of
+    per-time-point arrays.
+- fs : float
+    Sampling frequency in Hz.
+
+ATTRIBUTES:
+- array : np.ndarray | list
+    Stored data.
+- fs : float
+    Sampling frequency.
+- type : str
+    Data backend ("np" or "list").
+
+NOTES:
+- Many operations require NumPy-backed data and will raise if type == "list".
+- Use `to_numpy()` to convert list-backed data to NumPy.
+"""
 class TimeSeries:
     def __init__(self, array, fs: float):
         if not isinstance(array, (np.ndarray, list)):
@@ -903,7 +933,10 @@ class TimeSeries:
     def __len__(self):
         """Number of time points."""
         if self.type == "np":
-            return self.array.shape[1]
+            try:
+                return self.array.shape[1]
+            except IndexError:
+                return self.array.shape[0] # for the arrays that have just 1 feat, there is no possibility otherwise
         elif self.type == "list":
             return len(self.array)
     # EOF
@@ -964,19 +997,48 @@ class TimeSeries:
         self.set_fs(new_fs) # updates the fs
     # EOF
     def autocorr(self, metric: str ='correlation', max_lag: int = 20):
-        self.type_check()
+        self.to_numpy()
         ac_mat = autocorr_mat(self.array, metric=metric) 
         ac_line = get_lagplot(ac_mat, max_lag=max_lag, symmetric=True)
         return ac_mat, ac_line
     # EOF
     def lagged_corr(self, other: "TimeSeries", metric: str = 'correlation'):
-        self.type_check(); other.type_check()
+        self.to_numpy(); other.to_numpy()
         ac_mat = autocorr_mat(self.array, data2=other.array, metric=metric)
         return ac_mat 
     # EOF
 # EOC
 
 
+"""
+RSA
+Implements Representational Similarity Analysis (RSA) between a signal RDM
+and a model RDM.
+
+Handles RDM construction, metric configuration, and similarity computation.
+
+INPUT:
+- signal_RDM_metric : str
+    Distance/similarity metric used to compute the signal RDM.
+- model_RDM_metric : str | None
+    Metric for model RDM (defaults to signal_RDM_metric).
+- RSA_metric : str
+    Similarity metric between RDMs ("correlation" or "spearman").
+- signal_RDM : np.ndarray | None
+    Precomputed signal RDM (vector form).
+- model_RDM : np.ndarray | None
+    Precomputed model RDM (vector form).
+
+ATTRIBUTES:
+- signal_RDM_metric, model_RDM_metric : str
+- RSA_metric : str
+- signal_RDM, model_RDM : np.ndarray
+- similarity : float (set after compute_RSA)
+
+NOTES:
+- RDMs are assumed to be in vector (condensed) form.
+- Attribute existence is validated via `check_attributes`.
+"""
 class RSA:
     def __init__(
             self, 
@@ -1066,6 +1128,34 @@ class RSA:
 # EOC
 
 
+"""
+dRSA
+Extends RSA to time-resolved Representational Similarity Analysis.
+
+Computes RDMs at each time point and evaluates lagged or static RSA across time.
+
+INPUT:
+- signal_RDM_metric : str
+- model_RDM_metric : str | None
+- RSA_metric : str
+- signal_RDM_timeseries : TimeSeries | None
+    Time-resolved signal RDMs.
+- model_RDM_timeseries : TimeSeries | None
+    Time-resolved model RDMs.
+- model_RDM_static : np.ndarray | None
+    Static model RDM for time-resolved RSA.
+
+ATTRIBUTES:
+- signal_RDM_timeseries : TimeSeries
+- model_RDM_timeseries : TimeSeries
+- model_RDM_static : np.ndarray
+- dRSA_mat : np.ndarray
+- static_dRSA : TimeSeries
+
+NOTES:
+- TimeSeries objects are expected to iterate over vectorized RDMs.
+- Correlation-based static dRSA is vectorized; Spearman is loop-based.
+"""
 class dRSA(RSA):
     def __init__(
             self, 
@@ -1124,7 +1214,7 @@ class dRSA(RSA):
     def compute_static_dRSA(self):
         check_attributes(self, "signal_RDM_timeseries", "model_RDM")
         static_dRSA = []
-        if self.RSA_metric == 'correlation': # ADD create a correlation loop and improve spearman corr
+        if self.RSA_metric == 'correlation': 
             for t in range(len(self.signal_RDM_timeseries)):
                 static_dRSA.append(np.corrcoef(self.signal_RDM_timeseries.array[t], self.model_RDM)[0,1])
         elif self.RSA_metric == 'spearman':
