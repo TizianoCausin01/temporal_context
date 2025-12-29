@@ -4,11 +4,14 @@ import numpy as np
 import torch
 import argparse
 from sklearn.metrics.pairwise import pairwise_distances
-from scipy.spatial.distance import pdist
+from scipy.spatial.distance import pdist, squareform
 from scipy.spatial import cKDTree
 from sklearn.model_selection import KFold
 from sklearn.metrics import accuracy_score 
 from numba import njit
+from einops import reduce
+from einops.einops import EinopsError
+
 
 def print_wise(mex, rank=None):
     if rank == None:
@@ -735,3 +738,403 @@ def cosine_sim(x):
     gram = index_gram(gram)
     return gram
 # EOF
+
+
+
+# ---- HELPER FUNCTIONS ----
+"""
+bin_signal
+(same as get_bins in neural_utils.preprocessing)
+Computes time bins used to downsample (smooth) a time series to a new sampling frequency.
+1) Computes the averaging window length based on the ratio between original and target fs
+2) Generates bin edges spanning the full trial duration
+3) Ensures the last bin reaches the end of the trial
+
+INPUT:
+- time_series: time_series -> time_series object containing the signal and sampling rate
+- new_fs: float -> target sampling frequency (Hz)
+
+OUTPUT:
+- bins: np.ndarray -> array of integer indices defining bin edges along the time axis
+"""
+def bin_signal(time_series, new_fs):
+    len_avg_window = time_series.fs /new_fs
+    trial_duration = len(time_series)
+    bins = np.round(np.arange(0, trial_duration, len_avg_window)).astype(int)  # bins the target trial with the required resolution, convert to int for later indexing
+    if bins[-1] != trial_duration:
+        bins = np.append(bins, int(trial_duration))  # adds the last time bin
+    return bins
+# EOF
+
+
+"""
+smooth_signal
+(same as get_firing_rate in neural_utils.preprocessing)
+Applies temporal smoothing to a time series by averaging samples within predefined bins.
+1) Iterates over consecutive bin intervals
+2) Extracts the corresponding time slices from the signal
+3) Computes the mean activity within each bin
+4) Stacks the averaged chunks along the time dimension
+
+INPUT:
+- time_series: time_series -> time_series object containing the signal array
+- bins: np.ndarray -> array of integer bin edges defining smoothing windows
+
+OUTPUT:
+- smoothed_signal: np.ndarray -> time-smoothed signal with reduced temporal resolution
+"""
+def smooth_signal(time_series, bins):
+    smoothed_signal = []
+    
+    for idx_bin, bin_start in enumerate(bins[:-1]): # the last el in bin is just the end of the trial, that's why the [:-1] indexing
+        bin_end = bins[idx_bin + 1]
+        curr_chunk = time_series.array[:,bin_start:bin_end, ...]  # slices the current chunk
+        curr_avg_chunk = np.mean(curr_chunk, axis=1)  # computes the mean firing rate over the chunk
+        smoothed_signal.append(curr_avg_chunk)    
+    # end for idx, bin_start in enumerate(bins[:-1]):
+    smoothed_signal = np.stack(smoothed_signal, axis=1) # stacks time in the columns
+    return smoothed_signal
+# EOF
+
+
+def check_RDM_type(RDM_type: str):
+    if RDM_type not in ("signal", "model"):
+        raise ValueError(f"{RDM_type} is not a supported RDM_type, you can choose either 'signal' or 'model'")
+    # end if RDM_type != "signal" & RDM_type!="model":
+# EOF
+
+def check_attributes(obj, *attrs):
+    missing = [
+        attr for attr in attrs
+        if not hasattr(obj, attr) or getattr(obj, attr) is None
+    ]
+    if missing:
+        raise AttributeError(
+            f"{obj.__class__.__name__} has unset attributes: {missing}"
+        )
+
+# ---- CLASSES ----
+
+"""
+BrainAreas
+Utility class for slicing neural data into predefined brain areas.
+1) Loads brain-area channel indices from a YAML configuration file
+2) Validates input rasters against the expected number of channels
+3) Extracts and concatenates channel ranges corresponding to a given brain area
+
+INPUT:
+- monkey_name: str -> identifier used to select the correct brain-area mapping
+
+OUTPUT (slice_brain_area):
+- brain_area_response: np.ndarray -> subset of rasters corresponding to the selected brain area
+"""
+class BrainAreas:
+    def __init__(self, monkey_name: str):
+        self.monkey_name = monkey_name
+        with open("../../brain_areas.yaml", "r") as f:
+            config = yaml.safe_load(f)
+        try:
+            self.areas_idx = config[self.monkey_name]
+        except KeyError:
+            raise KeyError(f"Monkey '{self.monkey_name}' not found.", f"Supported monkeys {list(config.keys())}") from None
+        # end try:
+    # EOF
+    def slice_brain_area(self, rasters, brain_area_name):
+        if rasters.shape[0] < self.areas_idx["n_chan"]:
+            raise ValueError(f"Rasters of shape {rasters.shape} doesn't match the original number of channels ({self.areas_idx["n_chan"]}).")
+        # end if rasters.shape[0] < self.areas_idx["n_chan"]:
+
+        try:
+            target_brain_area = self.areas_idx[brain_area_name]
+        except KeyError:
+            raise KeyError(f"Brain area '{brain_area_name}' not found for monkey '{self.monkey_name}'.", f"Supported brain areas: {list(self.areas_idx.keys())}") from None
+        # end try:
+        brain_area_response = []
+        for lims in target_brain_area:
+            start, end = lims
+            brain_area_response.append(rasters[start:end, ...])
+        # end for lims in target_brain_area:
+        brain_area_response = np.concatenate(brain_area_response)
+        return brain_area_response
+    # EOF
+# EOC
+
+
+class TimeSeries:
+    def __init__(self, array, fs: float):
+        if not isinstance(array, (np.ndarray, list)):
+            raise TypeError(f"Unsupported type {type(array)}")
+        elif isinstance(array, np.ndarray):
+            self.type = "np"
+        elif isinstance(array, list):
+            self.type = "list"
+        # end if not isinstance(array, (np.ndarray, list)):
+        self.array = array
+        self.fs = fs
+    # EOF
+    def type_check(self):
+        if self.type != 'np':
+            raise TypeError(f"{self.type} type is not supported for this operation")
+        # end if self.type == 'np':
+    # --- GETTERS ---
+    def get_fs(self):
+        return self.fs
+    # EOF
+    def get_duration_ms(self):
+        return len(self) * 1000/self.fs 
+    # EOF
+    def get_duration_s(self):
+        return len(self) / self.fs
+    # EOF
+    def get_array(self):
+        return self.array
+    # EOF
+
+    # --- SETTERS ---
+    def set_fs(self, new_fs):
+        self.fs = new_fs
+    # EOF
+    def set_array(self, array):
+        self.type_check()
+        self.array = array
+    # EOF
+
+    # --- OTHER METHODS ---
+    def __len__(self):
+        """Number of time points."""
+        if self.type == "np":
+            return self.array.shape[1]
+        elif self.type == "list":
+            return len(self.array)
+    # EOF
+    def __iter__(self):
+        """Iterate over time points, yielding (neurons, trials)."""
+        if self.type == "np":
+            for t in range(len(self)):
+                yield self.array[:, t, ...]
+        elif self.type == "list":
+            for t in self.array:
+                yield t
+        # end if self.type == "np":
+    # EOF
+    def __getitem__(self, t):
+        """Return data at time index t: (neurons, trials)."""
+        if self.type == "np":
+            return self.array[:, t, ...]
+        elif self.type =="list":
+            return self.array[t]
+        # end if self.type == "np":
+    # EOF
+    def to_numpy(self):
+        if self.type == 'list':
+            self.array = np.stack(self.array, axis=1)
+            self.type = 'np'
+        # end if self.type == 'list':
+    # EOF
+    def trial_avg(self):
+        self.type_check()
+        try:
+            trial_avg = reduce(self.array, 'neurons time trials -> neurons time', 'mean')
+            return trial_avg
+        except EinopsError:
+            raise EinopsError(f"Array of size {self.array.shape} doesn't have the trial dimension (2nd dimension).") from None            
+        # end try:
+        # EOF
+    def neurons_avg(self):
+        self.type_check()
+        neurons_avg = reduce(self.get_array(), 'neurons time ... -> 1 time ...', 'mean')
+        return neurons_avg    
+    # EOF
+    def overall_avg(self):
+        self.type_check()
+        overall_avg = reduce(self.get_array(), 'neurons time ... -> time', 'mean')
+        return overall_avg
+    # EOF
+    def resample(self, new_fs):
+        self.type_check()
+        if new_fs < self.fs: # smoothing
+            bins = bin_signal(self, new_fs)
+            new_array = smooth_signal(self, bins)
+        elif new_fs > self.fs: # upsampling
+            upsampling_indices = get_upsampling_indices(len(self), self.fs, new_fs) # ADD modify to make if become a list
+            new_array = self.array[:,upsampling_indices, ...]
+        # end if new_fs < self.fs:
+        # in-place modifications
+        self.set_array(new_array) 
+        self.set_fs(new_fs) # updates the fs
+    # EOF
+    def autocorr(self, metric: str ='correlation', max_lag: int = 20):
+        self.type_check()
+        ac_mat = autocorr_mat(self.array, metric=metric) 
+        ac_line = get_lagplot(ac_mat, max_lag=max_lag, symmetric=True)
+        return ac_mat, ac_line
+    # EOF
+    def lagged_corr(self, other: "TimeSeries", metric: str = 'correlation'):
+        self.type_check(); other.type_check()
+        ac_mat = autocorr_mat(self.array, data2=other.array, metric=metric)
+        return ac_mat 
+    # EOF
+# EOC
+
+
+class RSA:
+    def __init__(
+            self, 
+            signal_RDM_metric: str, 
+            model_RDM_metric: str=None, 
+            RSA_metric: str='correlation', 
+            signal_RDM: np.ndarray = None, 
+            model_RDM: np.ndarray = None,
+            ):
+        self.signal_RDM_metric = signal_RDM_metric
+        if model_RDM_metric is None:
+            self.model_RDM_metric = signal_RDM_metric
+        else:
+            self.model_RDM_metric = model_RDM_metric
+        # end if model_RDM_metric is None:
+        self.RSA_metric = RSA_metric
+        self.signal_RDM = signal_RDM
+        self.model_RDM = model_RDM
+    # EOF
+    
+    # --- GETTERS ---
+    def get_RDM_metric(self, RDM_type):
+        check_RDM_type(RDM_type)
+        attr = f"{RDM_type}_RDM_metric"
+        return getattr(self, attr)
+    # EOF
+    def get_RSA_metric(self):
+        return self.RSA_metric
+    # EOF
+    def get_RDM(self, RDM_type: str):
+        check_RDM_type(RDM_type)
+        attr = f"{RDM_type}_RDM"
+        return getattr(self, attr)
+        #raise ValueError("Supported RDM types are 'signal' or 'model'")
+        # end if RDM_type == "signal":
+    # EOF
+
+    # --- SETTERS ---
+    def set_RDM_metrics(self, metric: str, RDM_type: str):
+        check_RDM_type(RDM_type)
+        attr = f"{RDM_type}_RDM_metric"
+        setattr(self, attr, metric)
+    # EOF
+    def set_RDM(self, RDM: np.ndarray, RDM_type: str):
+        check_RDM_type(RDM_type)
+        if RDM_type == "signal":
+            self.signal_RDM = RDM
+        elif RDM_type == "model":
+            self.model_RDM = RDM
+        else:
+            raise ValueError("Supported RDM types are 'signal' or 'model'")
+        # end if RDM_type == "signal":
+    # EOF
+    
+    # --- OTHER METHODS ---
+    def compute_RDM(self, data: np.ndarray, RDM_type: str):
+        check_RDM_type(RDM_type)
+        check_attributes(self, f"{RDM_type}_RDM_metric")
+        metric = getattr(self, f"{RDM_type}_RDM_metric")
+        attr = f"{RDM_type}_RDM"
+        RDM = create_RDM(data, metric)
+        setattr(self, attr, RDM)
+        return RDM
+    # EOF
+    def compute_both_RDMs(self, signal: np.ndarray, model: np.ndarray):
+        check_attributes(self, "signal_RDM_metric", "model_RDM_metric")
+        self.compute_RDM(signal, "signal")
+        self.compute_RDM(model, "model")
+    # EOF
+    def compute_RSA(self): 
+        check_attributes(self, "signal_RDM_metric", "model_RDM_metric", "RSA_metric", "signal_RDM", "model_RDM")
+        if self.RSA_metric == 'correlation':
+            similarity = np.corrcoef(self.signal_RDM, self.model_RDM)[0,1]
+        elif self.RSA_metric == 'spearman':
+            similarity = spearman(self.signal_RDM, self.model_RDM)
+        else:
+            raise TypeError(f"{self.RSA_metric} not supported.")
+        # if self.RSA_metric == 'correlation':
+        self.similarity = similarity
+        return similarity
+    # EOF
+    def squareform(self, RDM_type: str):
+        check_attributes(self, f"{RDM_type}_RDM")
+        target_RDM = self.get_RDM(RDM_type)
+        return squareform(target_RDM)
+    # EOF
+# EOC
+
+
+class dRSA(RSA):
+    def __init__(
+            self, 
+            signal_RDM_metric: str, 
+            model_RDM_metric: str=None, 
+            RSA_metric: str='correlation', 
+            signal_RDM_timeseries: TimeSeries = None, 
+            model_RDM_timeseries: TimeSeries = None,
+            model_RDM_static: np.ndarray = None,
+            ):
+        super().__init__(signal_RDM_metric, model_RDM_metric, RSA_metric)
+        self.signal_RDM_timeseries = signal_RDM_timeseries
+        self.model_RDM_timeseries = model_RDM_timeseries
+        self.model_RDM_static = model_RDM_static
+    # EOF
+
+    # --- GETTERS ---
+    def get_RDM_timeseries(self, RDM_type: str):
+        check_RDM_type(RDM_type)
+        attr = f"{RDM_type}_RDM_timeseries"
+        return getattr(self, attr)
+    # EOF
+    
+    # --- SETTERS ---
+    def set_RDM_timeseries(self, RDM_timeseries: TimeSeries, RDM_type: str):
+        check_RDM_type(RDM_type)
+        attr = f"{RDM_type}_RDM_timeseries"
+        setattr(self, attr, RDM_timeseries)
+    # EOF
+
+    # --- OTHER FUNCTIONS
+    def compute_RDM_timeseries(self, signal: TimeSeries, RDM_type: str):
+        check_RDM_type(RDM_type)
+        metric = getattr(self, f"{RDM_type}_RDM_metric")
+        signal_fs = signal.get_fs()
+        RDMs_list = []
+        for t in range(signal.array.shape[1]): 
+            RDM = create_RDM(
+                np.ascontiguousarray(signal.array[:,t,:]), 
+                metric
+            )
+            RDMs_list.append(RDM)
+        RDMs_list = TimeSeries(RDMs_list, signal_fs)
+        attr = f"{RDM_type}_RDM_timeseries"
+        setattr(self, attr, RDMs_list)
+    # EOF
+    def compute_both_RDM_timeseries(self, signal: TimeSeries, model: TimeSeries):
+        self.compute_RDM_timeseries(signal, "signal")
+        self.compute_RDM_timeseries(model, "model")
+    # EOF
+    def compute_dRSA(self):
+        check_attributes(self, "signal_RDM_timeseries", "model_RDM_timeseries")
+        self.dRSA_mat = self.signal_RDM_timeseries.lagged_corr(self.model_RDM_timeseries, self.RSA_metric)
+        return self.dRSA_mat
+    # EOF
+    def compute_static_dRSA(self):
+        check_attributes(self, "signal_RDM_timeseries", "model_RDM")
+        static_dRSA = []
+        if self.RSA_metric == 'correlation': # ADD create a correlation loop and improve spearman corr
+            for t in range(len(self.signal_RDM_timeseries)):
+                static_dRSA.append(np.corrcoef(self.signal_RDM_timeseries.array[t], self.model_RDM)[0,1])
+        elif self.RSA_metric == 'spearman':
+            for t in self.signal_RDM_timeseries:
+                static_dRSA.append(spearman(t, self.model_RDM))
+            # end for i_time in signal.shape[1]:
+        static_dRSA = np.array(static_dRSA)
+        # end if metric == 'correlation':
+        static_dRSA = TimeSeries(static_dRSA, self.signal_RDM_timeseries.fs)
+        self.static_dRSA = static_dRSA
+        return static_dRSA
+    # EOF
+# EOC
