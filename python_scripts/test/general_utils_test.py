@@ -7,7 +7,7 @@ with open("../../config.yaml", "r") as f:
     config = yaml.safe_load(f)
 paths = config[ENV]["paths"]
 sys.path.append(paths["src_path"])
-from general_utils.utils import print_wise, get_lagplot, autocorr_mat, create_RDM, spearman, compute_dRSA, nan_check, choose_summary_stat, get_lagplot_subset, index_gram, cosine_sim
+from general_utils.utils import print_wise, get_lagplot, autocorr_mat, create_RDM, spearman, compute_dRSA, nan_check, choose_summary_stat, get_lagplot_subset, index_gram, cosine_sim, subsample_RDM
 
 # --- Tests for get_lagplot_checks (indirect because we don't export it) ---
 
@@ -404,3 +404,81 @@ def test_cosine_sim_zero_vector():
 
     out = cosine_sim(x)
     assert np.any(np.isnan(out))
+
+def test_subsample_rdm_shape():
+    RDM = np.random.randn(10, 10)
+    idx = [1, 3, 5, 7]
+
+    out = subsample_RDM(RDM, idx)
+
+    assert out.shape == (len(idx), len(idx))
+
+def test_subsample_rdm_values():
+    RDM = np.arange(100).reshape(10, 10)
+    idx = [2, 4, 9]
+
+    out = subsample_RDM(RDM, idx)
+
+    ref = RDM[np.ix_(idx, idx)]
+    assert np.array_equal(out, ref)
+
+def test_subsample_rdm_order():
+    RDM = np.arange(25).reshape(5, 5)
+    idx = [4, 1, 3]
+
+    out = subsample_RDM(RDM, idx)
+
+    ref = RDM[np.ix_(idx, idx)]
+    assert np.array_equal(out, ref)
+
+def test_subsample_rdm_duplicate_indices():
+    RDM = np.random.randn(6, 6)
+    idx = [1, 1, 4]
+
+    out = subsample_RDM(RDM, idx)
+
+    assert out.shape == (3, 3)
+    assert np.allclose(out[0], out[1])
+
+def test_subsample_rdm_single_index():
+    RDM = np.random.randn(5, 5)
+    idx = [3]
+
+    out = subsample_RDM(RDM, idx)
+
+    assert out.shape == (1, 1)
+    assert out[0, 0] == RDM[3, 3]
+
+def test_subsample_rdm_full_indices():
+    n = 7
+    RDM = np.random.randn(n, n)
+    idx = list(range(n))
+
+    out = subsample_RDM(RDM, idx)
+
+    assert np.array_equal(out, RDM)
+
+def test_subsample_rdm_empty_indices():
+    RDM = np.random.randn(5, 5)
+    idx = []
+
+    out = subsample_RDM(RDM, idx)
+
+    assert out.shape == (0, 0)
+
+
+def test_subsample_rdm_symmetry():
+    A = np.random.randn(6, 6)
+    RDM = (A + A.T) / 2
+    idx = [0, 2, 5]
+
+    out = subsample_RDM(RDM, idx)
+
+    assert np.allclose(out, out.T)
+
+def test_subsample_rdm_invalid_indices():
+    RDM = np.random.randn(5, 5)
+    idx = [0, 6]
+
+    with pytest.raises(IndexError):
+        subsample_RDM(RDM, idx)
