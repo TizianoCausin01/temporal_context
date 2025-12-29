@@ -7,7 +7,7 @@ with open("../../config.yaml", "r") as f:
     config = yaml.safe_load(f)
 paths = config[ENV]["paths"]
 sys.path.append(paths["src_path"])
-from general_utils.utils import print_wise, get_lagplot, autocorr_mat, create_RDM, spearman, compute_dRSA, nan_check, choose_summary_stat, get_lagplot_subset
+from general_utils.utils import print_wise, get_lagplot, autocorr_mat, create_RDM, spearman, compute_dRSA, nan_check, choose_summary_stat, get_lagplot_subset, index_gram, cosine_sim
 
 # --- Tests for get_lagplot_checks (indirect because we don't export it) ---
 
@@ -315,3 +315,92 @@ def test_zero_prediction():
     c = get_lagplot(a, max_lag=10, min_datapts=1)
     assert np.all(np.equal(b[:10], np.zeros(10)))
     assert np.all(np.equal(c[:10], np.zeros(10)))
+
+
+@pytest.mark.parametrize("n", [2, 3, 5, 10])
+def test_index_gram_length(n):
+    gram = np.random.randn(n, n)
+    out = index_gram(gram)
+    assert out.shape == (n * (n - 1) // 2,)
+
+def test_index_gram_matches_numpy_triu():
+    n = 6
+    gram = np.random.randn(n, n)
+
+    rows, cols = np.triu_indices(n, k=1)
+    ref = gram[rows, cols]
+
+    out = index_gram(gram)
+
+    assert np.allclose(out, ref)
+
+
+def test_index_gram_symmetric_matrix():
+    n = 5
+    A = np.random.randn(n, n)
+    gram = (A + A.T) / 2
+
+    out = index_gram(gram)
+    ref = squareform(gram, checks=False)
+
+    assert np.allclose(out, ref)
+
+
+def test_index_gram_ignores_diagonal():
+    gram = np.eye(4)
+    out = index_gram(gram)
+    assert np.all(out == 0)
+
+
+@pytest.mark.parametrize("n,d", [(5, 3), (10, 2), (20, 8)])
+def test_cosine_sim_shape(n, d):
+    x = np.random.randn(d, n)
+    out = cosine_sim(x)
+    assert out.shape == (n * (n - 1) // 2,)
+
+
+def test_cosine_sim_matches_scipy():
+    d, n = 6, 10
+    x = np.random.randn(d, n)
+
+    ref = pdist(x.T, metric="cosine")
+    out = cosine_sim(x)
+
+    assert np.allclose(out, ref, atol=1e-6)
+
+
+def test_cosine_sim_self_zero():
+    x = np.random.randn(5, 7)
+    gram = 1 - (x / np.linalg.norm(x, axis=0)).T @ (x / np.linalg.norm(x, axis=0))
+
+    vec = index_gram(gram)
+    assert np.all(vec >= 0)
+
+
+def test_cosine_sim_identical_vectors():
+    v = np.random.randn(5, 1)
+    x = np.repeat(v, 4, axis=1)
+
+    out = cosine_sim(x)
+    assert np.allclose(out, 0)
+
+
+def test_cosine_sim_orthogonal():
+    x = np.eye(4)
+    out = cosine_sim(x)
+    assert np.allclose(out, 1)
+
+
+def test_cosine_sim_scale_invariance():
+    x = np.random.randn(5, 6)
+    out1 = cosine_sim(x)
+    out2 = cosine_sim(10 * x)
+    assert np.allclose(out1, out2)
+
+
+def test_cosine_sim_zero_vector():
+    x = np.random.randn(5, 4)
+    x[:, 0] = 0
+
+    out = cosine_sim(x)
+    assert np.any(np.isnan(out))
