@@ -4,7 +4,7 @@ from scipy.io import loadmat
 import pickle
 import cv2
 sys.path.append("..")
-from general_utils.utils import print_wise, get_upsampling_indices, delete_empty_keys
+from general_utils.utils import print_wise, get_upsampling_indices, delete_empty_keys, check_attributes, BrainAreas, TimeSeries
 from image_processing.utils import get_video_dimensions, load_stimuli_models
 from data_preprocessing.preprocessing import min_max_normalization
 
@@ -283,3 +283,5 @@ def extract_all_fixation_responses(n_norm, gaze_data, all_models, n_timepts_bef,
         all_model_fix = np.stack(all_model_fix, axis=-1)      
     # end if stack == 1:
     return all_neural_fix, all_gaze_fix, all_model_fix
+
+

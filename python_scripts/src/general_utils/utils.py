@@ -1,6 +1,7 @@
 import sys, os, yaml
 from datetime import datetime
 import numpy as np
+import h5py
 import torch
 import argparse
 from sklearn.metrics.pairwise import pairwise_distances
@@ -739,8 +740,63 @@ def cosine_sim(x):
     return gram
 # EOF
 
+"""
+compute_samples_sizes
+Computes a sequence of sample sizes used for iterative or scaling analyses.
+
+Generates a 1D array of sample sizes starting from `step_samples` up to
+`max_size` (inclusive), with a fixed step.
+
+INPUT:
+- cfg: Cfg -> configuration object with required attributes:
+    * step_samples: int
+    * max_size: int
+
+OUTPUT:
+- n_samples: np.ndarray -> array of sample sizes
+"""
+def compute_samples_sizes(cfg):
+    check_attributes(cfg, "step_samples", "max_size")
+    n_samples = np.arange(cfg.step_samples, cfg.max_size +1, cfg.step_samples)
+    return n_samples
+# EOF
 
 
+"""
+load_img_natraster
+Loads and preprocesses natural image raster data for a given monkey/session.
+
+1) Loads the MATLAB v7.3 natraster file (HDF5 format)
+2) Casts data to float32 and reorders axes to (neurons, time, trials)
+3) Optionally slices the signal to a specific brain area
+4) Wraps the data in a TimeSeries object
+5) Resamples the signal to the target sampling frequency
+
+INPUT:
+- paths: dict[str, str] -> dictionary containing base data paths
+- cfg: Cfg -> configuration object with required attributes:
+    * monkey_name: str
+    * date: str
+    * new_fs: float
+    * brain_area (optional): str
+
+OUTPUT:
+- rasters: TimeSeries -> preprocessed neural raster time series
+"""
+def load_img_natraster(paths: dict[str: str], cfg):
+    check_attributes(cfg, "monkey_name", "date", "new_fs")
+    rasters_path = f"{paths['livingstone_lab']}/tiziano/data/{cfg.monkey_name}_natraster{cfg.date}.mat"
+    with h5py.File(rasters_path, "r") as f:
+        rasters = f["natraster"][:]      
+    rasters = rasters.astype(np.float32)
+    rasters = rasters.transpose(2, 1, 0)
+    if hasattr(cfg, "brain_area"):
+            brain_areas_obj = BrainAreas(cfg.monkey_name)
+            rasters = brain_areas_obj.slice_brain_area(rasters, cfg.brain_area)
+    rasters = TimeSeries(rasters, 1000)
+    rasters.resample(cfg.new_fs)
+    return rasters
+# EOF
 # ---- HELPER FUNCTIONS ----
 """
 bin_signal
@@ -840,9 +896,9 @@ class BrainAreas:
         # end try:
     # EOF
     def slice_brain_area(self, rasters, brain_area_name):
-        if rasters.shape[0] < self.areas_idx["n_chan"]:
+        if rasters.shape[0] < self.areas_idx["n_chan"][0]:
             raise ValueError(f"Rasters of shape {rasters.shape} doesn't match the original number of channels ({self.areas_idx["n_chan"]}).")
-        # end if rasters.shape[0] < self.areas_idx["n_chan"]:
+        # end if rasters.shape[0] < self.areas_idx["n_chan"][0]:
 
         try:
             target_brain_area = self.areas_idx[brain_area_name]
