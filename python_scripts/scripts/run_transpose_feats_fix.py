@@ -6,7 +6,7 @@ with open("../../config.yaml", "r") as f:
     config = yaml.safe_load(f)
 paths = config[ENV]["paths"]
 sys.path.append(paths["src_path"])
-from general_utils.utils import get_relevant_output_layers
+from general_utils.utils import print_wise, get_relevant_output_layers
 
 
 
@@ -20,7 +20,7 @@ if __name__ == "__main__":
     parser.add_argument("--pooling", type=str)
     
     cfg = parser.parse_args()
-    task_list = get_relevant_output_layers(cfg.model_name, pkg=cfg.pkg)
+    layers = get_relevant_output_layers(cfg.model_name, pkg=cfg.pkg)
     for l in layers:
         feats_save_name = f"{paths['livingstone_lab']}/tiziano/models/{cfg.monkey_name}_{cfg.date}_{cfg.model_name}_{cfg.img_size}_{l}_features_{cfg.pooling}pool.npz"
         arr = np.load(feats_save_name)["arr_0"]
