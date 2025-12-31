@@ -797,6 +797,15 @@ def load_img_natraster(paths: dict[str: str], cfg):
     rasters.resample(cfg.new_fs)
     return rasters
 # EOF
+
+""" 
+load_npz_as_dict
+Loads the saved npz file as a dict 
+"""
+def load_npz_as_dict(path: str) -> dict[str, np.ndarray]:
+    with np.load(path, allow_pickle=False) as data:
+        return {k: data[k] for k in data.files}
+# EOF 
 # ---- HELPER FUNCTIONS ----
 """
 bin_signal
