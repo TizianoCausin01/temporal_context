@@ -1,7 +1,16 @@
+tenets:
+- if possible, in their familiar enclosures
+- if possible, people/monkeys they know already
+- if possible, the "real"/most important object/information should appear in it's fullness (and in the center of the screen) only at the end of the video
+
+Brainstorm:
 turning face
 face going to be occluded
 occluded face going to be uncovered
 face that moves towards the center
 face that moves from center to outside
-monkey locomotion
+monkey locomotion/monkey climbing
+well known affiliation/intimidatory expressions (like lip-smacking or yawning)
+people giving them treatments
+humans wearing known DPIs doing something they do every day in the cages and then in the end they take off the DPIs 
 
