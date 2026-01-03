@@ -806,6 +806,32 @@ def load_npz_as_dict(path: str) -> dict[str, np.ndarray]:
     with np.load(path, allow_pickle=False) as data:
         return {k: data[k] for k in data.files}
 # EOF 
+
+
+"""
+get_module_by_path
+Resolve a dotted module path with numeric indices.
+Pass attribute path divided by dots and each digit is used index.
+INPUT:
+    - obj: object -> the object (any Python obj) from which we want to extract the attribute.
+    - attribute_path: str -> the path from which we want to extract the attribute, separated by dots
+        e.g. attribute_path = "layer.0.mlp.down_proj" -> model.layer[0].mlp.down_proj
+OUTPUT:
+    - obj: object -> the module extracted from the input object
+"""
+def get_module_by_path(obj, attribute_path: str):
+    # it reassignes obj recursively as it goes deeper in the attributes
+    for part in attribute_path.split("."): 
+        if part.isdigit():
+            obj = obj[int(part)]
+        else:
+            obj = getattr(obj, part)
+        # end 
+    # end for part in path.split("."):
+    return obj
+# EOF
+
+
 # ---- HELPER FUNCTIONS ----
 """
 bin_signal

@@ -4,7 +4,7 @@ import numpy as np
 from torchvision import models, transforms
 import timm
 from scipy.io import loadmat
-from einops import reduce
+from einops import reduce, rearrange
 sys.path.append("..")
 from general_utils.utils import print_wise, get_upsampling_indices, is_empty
 
@@ -319,11 +319,31 @@ def get_usual_transform(resize_size=224, center_crop_size=None, normalize=True):
     # end if normalize:
     transform = transforms.Compose(transform_list)
     return transform
+# EOF
 
+"""
+pool_features
+Pool the features along spatial or token dimensions depending on the input shape.
+
+INPUT:
+    - features: np.ndarray or torch.Tensor -> tensor of shape
+        (batch, channels, H, W) for CNNs,
+        (batch, tokens, emb_dim) for ViTs,
+        or (batch, features) for classifier layers
+    - pooling: str -> pooling method to apply ('mean', 'sum', etc.), or 'all' to flatten all non-batch dimensions
+
+OUTPUT:
+    - pooled_features: same type as input -> features after applying pooling:
+        - CNNs: pooled across H and W
+        - ViTs: pooled across tokens
+        - classifier layers: unchanged
+        - 'all': flattened into (batch, -1)
+"""
 def pool_features(features, pooling):
     dimensions = features.shape
     if pooling == 'all':
-        return features
+        pooled_features = rearrange(features, 'batch ... -> batch (...)')
+        return pooled_features
     if len(dimensions) == 4: # CNNs case
         pooled_features = reduce(features, 'batch_size chan h w -> batch_size chan', pooling)
     elif len(dimensions) == 3: # the ViT case
@@ -332,3 +352,28 @@ def pool_features(features, pooling):
         pooled_features = features
     # end
     return pooled_features
+# EOF
+
+
+"""
+get_activation
+Create a forward hook to extract intermediate features from a module.
+The hook optionally pools the output before storing it.
+
+INPUT:
+    - name: str -> key under which to store the extracted features
+    - features: dict[str: torch.ndarray] -> the features dict ["layer_name": features_array]
+    - pooling: str -> pooling method to apply on the output ('all', 'mean', etc.)
+
+OUTPUT:
+    - hook: callable -> a function suitable for `module.register_forward_hook`
+        that captures the module output in a global `features` dictionary
+        under the provided name
+"""
+def get_activation(name, features, pooling='all'):
+    def hook(model, input, output, pooling=pooling):
+        output = pool_features(output, pooling)
+        features[name] = output
+    # EOF
+    return hook
+# EOF
