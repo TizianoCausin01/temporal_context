@@ -783,18 +783,20 @@ INPUT:
 OUTPUT:
 - rasters: TimeSeries -> preprocessed neural raster time series
 """
-def load_img_natraster(paths: dict[str: str], cfg):
-    check_attributes(cfg, "monkey_name", "date", "new_fs")
-    rasters_path = f"{paths['livingstone_lab']}/tiziano/data/{cfg.monkey_name}_natraster{cfg.date}.mat"
+def load_img_natraster(paths: dict[str: str], monkey_name, date, new_fs=None, brain_area=None):
+    rasters_path = f"{paths['livingstone_lab']}/tiziano/data/{monkey_name}_natraster{date}.mat"
     with h5py.File(rasters_path, "r") as f:
         rasters = f["natraster"][:]      
     rasters = rasters.astype(np.float32)
     rasters = rasters.transpose(2, 1, 0)
-    if hasattr(cfg, "brain_area"):
-            brain_areas_obj = BrainAreas(cfg.monkey_name)
-            rasters = brain_areas_obj.slice_brain_area(rasters, cfg.brain_area)
+    if brain_area is not None:
+            brain_areas_obj = BrainAreas(monkey_name)
+            rasters = brain_areas_obj.slice_brain_area(rasters, brain_area)
+    # end if brain_area is not None:
     rasters = TimeSeries(rasters, 1000)
-    rasters.resample(cfg.new_fs)
+    if new_fs is not None:
+        rasters.resample(new_fs)
+    # if new_fs is not None:
     return rasters
 # EOF
 
@@ -930,11 +932,10 @@ class BrainAreas:
             raise KeyError(f"Monkey '{self.monkey_name}' not found.", f"Supported monkeys {list(config.keys())}") from None
         # end try:
     # EOF
-    def slice_brain_area(self, rasters, brain_area_name):
-        if rasters.shape[0] < self.areas_idx["n_chan"][0]:
-            raise ValueError(f"Rasters of shape {rasters.shape} doesn't match the original number of channels ({self.areas_idx["n_chan"]}).")
+    def slice_brain_area(self, rasters: "TimeSeries", brain_area_name: str):
+        if rasters.get_array().shape[0] < self.areas_idx["n_chan"][0]:
+            raise ValueError(f"Rasters of shape {rasters.get_array().shape} doesn't match the original number of channels ({self.areas_idx["n_chan"]}).")
         # end if rasters.shape[0] < self.areas_idx["n_chan"][0]:
-
         try:
             target_brain_area = self.areas_idx[brain_area_name]
         except KeyError:
@@ -943,9 +944,10 @@ class BrainAreas:
         brain_area_response = []
         for lims in target_brain_area:
             start, end = lims
-            brain_area_response.append(rasters[start:end, ...])
+            brain_area_response.append(rasters.get_array()[start:end, ...])
         # end for lims in target_brain_area:
         brain_area_response = np.concatenate(brain_area_response)
+        brain_area_response = TimeSeries(brain_area_response, rasters.fs)
         return brain_area_response
     # EOF
 # EOC
@@ -1082,6 +1084,8 @@ class TimeSeries:
         elif new_fs > self.fs: # upsampling
             upsampling_indices = get_upsampling_indices(len(self), self.fs, new_fs) # ADD modify to make if become a list
             new_array = self.array[:,upsampling_indices, ...]
+        else:
+            new_array = self.array
         # end if new_fs < self.fs:
         # in-place modifications
         self.set_array(new_array) 

@@ -29,7 +29,7 @@ if __name__ == "__main__":
     cfg = parser.parse_args()
 
     task_list = get_relevant_output_layers(cfg.model_name, cfg.pkg)
-    area_rasters = load_img_natraster(paths, cfg)
+    area_rasters = load_img_natraster(paths, cfg.monkey_name, cfg.date, new_fs=cfg.new_fs, brain_area=cfg.brain_area)
     n_trials = area_rasters.array.shape[2]
     n_samples = compute_samples_sizes(cfg)
     drsa_obj, whole_RDM_signal = init_whole_neural_RDM(area_rasters, cfg)
