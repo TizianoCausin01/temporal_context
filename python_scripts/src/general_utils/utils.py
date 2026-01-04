@@ -834,6 +834,27 @@ def get_module_by_path(obj, attribute_path: str):
 # EOF
 
 
+"""
+get_tril_perms
+Generate all unique unordered pairs (i, j) from a list, with i preceding j.
+This corresponds to the lower-triangular (or upper-triangular) combinations
+without self-pairs or duplicates.
+INPUT:
+    - in_list: list -> List of elements.
+OUTPUT:
+    - tuples_list: list[tuple] -> List of pairs (i, j) with i != j and each pair appearing once.
+"""
+def get_tril_perms(in_list: list):
+    tuples_list = []
+    for idx, i in enumerate(in_list):
+        for j in in_list[idx+1:]:
+            tuples_list.append((i,j))
+        # end for j in in_list[idx+1:]:
+    # end for idx, i in enumerate(in_list):
+    return tuples_list
+# EOF
+
+
 # ---- HELPER FUNCTIONS ----
 """
 bin_signal
