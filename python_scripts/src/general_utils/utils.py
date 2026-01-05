@@ -949,10 +949,19 @@ class BrainAreas:
             config = yaml.safe_load(f)
         try:
             self.areas_idx = config[self.monkey_name]
+            self.brain_areas = [k for k in self.areas_idx.keys() if k!='n_chan']
         except KeyError:
             raise KeyError(f"Monkey '{self.monkey_name}' not found.", f"Supported monkeys {list(config.keys())}") from None
         # end try:
     # EOF
+    # --- GETTERS ---
+    def get_brain_areas_idx(self):
+        return self.areas_idx
+    #EOF
+    def get_brain_areas(self):
+        return self.brain_areas
+    #EOF
+    # --- OTHER FUNCTIONS ---
     def slice_brain_area(self, rasters: "TimeSeries", brain_area_name: str):
         if rasters.get_array().shape[0] < self.areas_idx["n_chan"][0]:
             raise ValueError(f"Rasters of shape {rasters.get_array().shape} doesn't match the original number of channels ({self.areas_idx["n_chan"]}).")
