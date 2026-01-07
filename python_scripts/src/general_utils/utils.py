@@ -1197,8 +1197,6 @@ class RSA:
         check_RDM_type(RDM_type)
         attr = f"{RDM_type}_RDM"
         return getattr(self, attr)
-        #raise ValueError("Supported RDM types are 'signal' or 'model'")
-        # end if RDM_type == "signal":
     # EOF
 
     # --- SETTERS ---
