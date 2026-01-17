@@ -109,8 +109,8 @@ Side effects:
 - Saves a compressed .npz file containing the subsampling results
 """
 def similarity_subsamples_par(paths: dict[str: str], rank: int, layer_name: str, drsa_obj: dRSA, whole_RDM_signal: list[np.ndarray], n_samples: np.ndarray[int], cfg):
-    check_attributes(cfg, "new_fs", "monkey_name", "model_name", "img_size", "n_iter", "brain_area")
-    dict_savename = f"{paths['livingstone_lab']}/tiziano/results/subsampling_{cfg.new_fs}Hz_{n_samples[0]}-{n_samples[-1]}_{cfg.n_iter}iter_{cfg.monkey_name}_{cfg.date}_{cfg.brain_area}_{cfg.model_name}_{cfg.img_size}_{layer_name}.npz"
+    check_attributes(cfg, "new_fs", "monkey_name", "model_name", "img_size", "n_iter", "brain_area", "RDM_metric")
+    dict_savename = f"{paths['livingstone_lab']}/tiziano/results/subsampling_{cfg.new_fs}Hz_{n_samples[0]}-{n_samples[-1]}_{cfg.n_iter}iter_{cfg.monkey_name}_{cfg.date}_{cfg.brain_area}_{cfg.RDM_metric}_{cfg.model_name}_{cfg.img_size}_{layer_name}.npz"
     if os.path.exists(dict_savename):
         print_wise(f"model already exists at {dict_savename}", rank=rank)
     else:

@@ -789,11 +789,11 @@ def load_img_natraster(paths: dict[str: str], monkey_name, date, new_fs=None, br
         rasters = f["natraster"][:]      
     rasters = rasters.astype(np.float32)
     rasters = rasters.transpose(2, 1, 0)
+    rasters = TimeSeries(rasters, 1000)
     if brain_area is not None:
             brain_areas_obj = BrainAreas(monkey_name)
             rasters = brain_areas_obj.slice_brain_area(rasters, brain_area)
     # end if brain_area is not None:
-    rasters = TimeSeries(rasters, 1000)
     if new_fs is not None:
         rasters.resample(new_fs)
     # if new_fs is not None:

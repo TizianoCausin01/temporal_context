@@ -25,5 +25,6 @@ if __name__ == "__main__":
     area_rasters = load_img_natraster(paths, cfg.monkey_name, cfg.date, new_fs=cfg.new_fs)
     ba_obj = BrainAreas(cfg.monkey_name)
     brain_areas = ba_obj.get_brain_areas()
-    tasks_list = get_triu_perms(brain_areas)
+    task_list = get_triu_perms(brain_areas)
+    raster = load_img_natraster(paths, cfg.monkey_name, cfg.date, new_fs=cfg.new_fs)
     master_workers_queue(task_list, paths, across_areas_dRSA, *(raster, ba_obj, cfg)) 
