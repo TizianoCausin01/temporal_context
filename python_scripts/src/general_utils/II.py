@@ -2,7 +2,7 @@ import os, yaml, sys
 import numpy as np
 from scipy.spatial.distance import squareform
 sys.path.append("..")
-from general_utils.utils import RSA
+from general_utils.utils import RSA, dRSA, TimeSeries
 
 """
 InformationImbalance
@@ -138,3 +138,136 @@ def compare_similarity_metrics(data: np.ndarray, metric1: str, metric2: str, k: 
     ii_A2B, ii_B2A = ii_obj.compute_both_II()
     return ii_obj, ii_A2B, ii_B2A
 # EOF
+
+class dynInformationImbalance(InformationImbalance, dRSA):
+    def __init__(self, 
+        signal_RDM_metric: str, 
+        model_RDM_metric: str, 
+        k: int = 1,
+        RSA_metric: str='correlation', 
+        signal_RDM: np.ndarray = None, 
+        model_RDM: np.ndarray = None,
+        signal_RDM_timeseries: TimeSeries = None, 
+        model_RDM_timeseries: TimeSeries = None,
+        model_RDM_static: np.ndarray = None,
+        ):
+            
+        super().__init__(signal_RDM_metric, model_RDM_metric, k=k, RSA_metric=RSA_metric)
+        self.signal_RDM_timeseries = signal_RDM_timeseries
+        self.model_RDM_timeseries = model_RDM_timeseries
+        self.model_RDM_static = model_RDM_static
+
+    def compute_distance_ranks_dyn(self, RDM_t): # doesn't overrides the previous method because I added _dyn
+        """ 
+        auxiliary function for compute_distance_ranks_timeseries to compute the distance ranks without assigning
+        any new attribute (useful for the loop)
+        """
+        RDM = squareform(RDM_t)
+        # end if RDM_type is not None:
+        self.N = RDM.shape[0] # include it also in the setter
+        np.fill_diagonal(RDM, np.inf)
+        order = np.argsort(RDM, axis=0)
+        # stores the indices of the k mins so that we don't have to compute the argmin later
+        kmins = order[:self.k, :]
+        ranks = np.argsort(order, axis=0)
+        ranks = ranks + 2*np.eye(ranks.shape[0])
+        return ranks, kmins
+    # EOF
+
+    def compute_distance_ranks_timeseries(self, RDM_type): 
+        """
+        preceded by compute_RDM_timeseries from dRSA, computes the ranks (ranks_ts)
+        and NNs for the target RDM timeseries
+        """
+        ranks_ts = []
+        kmins_ts = []
+        for RDM_t in self.get_RDM_timeseries(RDM_type):
+                ranks, kmins = self.compute_distance_ranks_dyn(RDM_t)
+                ranks_ts.append(ranks)
+                kmins_ts.append(kmins)
+        fs = self.get_RDM_timeseries(RDM_type).get_fs()
+        ranks_ts = TimeSeries(ranks_ts, fs)
+        kmins_ts = TimeSeries(kmins_ts, fs)
+        setattr(self, f"{RDM_type}_distance_ranks_timeseries", ranks_ts)
+        setattr(self, f"{RDM_type}_kmins_idx_timeseries", kmins_ts) 
+    # EOF
+
+    def compute_both_distance_ranks_timeseries(self): 
+        """
+        repeats compute_distane_ranks_timeseries twice
+        """
+        self.compute_distance_ranks_timeseries("signal")
+        self.compute_distance_ranks_timeseries("model")
+
+    def compute_dynII(self, II_type: str): # ADD the possibility to slice, accelerate the nested for loops with numba
+        """
+        computes the full lagged matrix of II. It's always (conditioning_var x conditioned_var), so pay attention 
+        when comparing them
+        """
+        if II_type == 'A2B':
+            conditioning_var = 'signal'
+            conditioned_var = 'model'
+        elif II_type == 'B2A':
+            conditioning_var = 'model'
+            conditioned_var = 'signal'
+        # end if II_type == 'A2B':
+        conditioning_mins_t = getattr(self, f"{conditioning_var}_kmins_idx_timeseries")
+        to_be_conditioned_ranks_t = getattr(self, f"{conditioned_var}_distance_ranks_timeseries")
+        dynII_mat = np.zeros((len(conditioning_mins_t), len(to_be_conditioned_ranks_t)))
+        for i, mins in enumerate(conditioning_mins_t):
+            for j, ranks in enumerate(to_be_conditioned_ranks_t):
+                conditioned_ranks = np.take_along_axis(ranks, mins, axis=0)
+                II = (2/(self.N**2 * self.k))*np.sum(conditioned_ranks)
+                dynII_mat[i, j] = II
+        setattr(self, f"dynII_{II_type}", dynII_mat)
+        return dynII_mat
+    # EOF
+
+    def compute_both_dynII(self):
+        """
+        repeats compute_dynII in both directions
+        """
+        dynII_mat_A2B = self.compute_dynII('A2B')
+        dynII_mat_B2A = self.compute_dynII('B2A')
+        return dynII_mat_A2B, dynII_mat_B2A
+    # EOF
+    
+    def compute_static_dynII(self, II_type):
+        """
+        computes the static_dynII (static model, dynamic signal)
+        A is always the signal, but A_t in A2B is the signal's NNs, in
+        B2A is the signal's ranks and viceversa for B. 
+        """
+        if II_type == 'A2B':
+            A_t = getattr(self, f"signal_kmins_idx_timeseries")
+            B = getattr(self, f"model_distance_ranks")
+        elif II_type == 'B2A':
+            A_t = getattr(self, f"signal_distance_ranks_timeseries")
+            B = getattr(self, f"model_kmins_idx")
+        # end if II_type == 'A2B':
+        static_dynII = []
+        for A in A_t:
+            if II_type == 'A2B':
+                conditioned_ranks = np.take_along_axis(B, A, axis=0) # ranks_B | mins_A = signal conditions model
+            elif II_type == 'B2A':
+                conditioned_ranks = np.take_along_axis(A, B, axis=0) # ranks_A | mins_B = model conditions signal
+            # end if 'A2B':
+            II = (2/(self.N**2 * self.k))*np.sum(conditioned_ranks)
+            static_dynII.append(II)
+        # end for ranks in to_be_conditioned_ranks_t:
+        fs = A_t.get_fs()
+        static_dynII = TimeSeries(static_dynII, fs)
+        setattr(self, f"static_dynII_{II_type}", static_dynII)
+        return static_dynII
+    # EOF
+
+    def compute_both_static_dynII(self):
+        """
+        computes the static_dynII in both senses
+        """
+        static_dynII_A2B = self.compute_static_dynII('A2B')
+        static_dynII_B2A = self.compute_static_dynII('B2A')
+        return static_dynII_A2B, static_dynII_B2A
+    # EOF
+# EOC
+
