@@ -33,7 +33,7 @@ OUTPUT:
     - None
         Displays the figure.
 """
-def plot_subsamples(paths, layers, cfg, ylim = None):
+def plot_subsamples(paths, layers, cfg, ylim = None, save=False):
     n_layers = len(layers)
     ncols = 4
     nrows = int(np.ceil(n_layers / ncols))
@@ -54,7 +54,7 @@ def plot_subsamples(paths, layers, cfg, ylim = None):
         file_name = (
             f"subsampling_{cfg.new_fs}Hz_{cfg.step_samples}-{cfg.max_size}_"
             f"{cfg.n_iter}iter_{cfg.monkey_name}_{cfg.date}_"
-            f"{cfg.brain_area}_{cfg.model_name}_{cfg.img_size}_{l}.npz"
+            f"{cfg.brain_area}_{cfg.RDM_metric}_{cfg.model_name}_{cfg.img_size}_{l}.npz"
         )
         results_path = f"{paths['livingstone_lab']}/tiziano/results/{file_name}"
         iter_dict = load_npz_as_dict(results_path)
@@ -102,4 +102,7 @@ def plot_subsamples(paths, layers, cfg, ylim = None):
         ax.set_xticks(xtickspos)
         ax.set_xticklabels([int(xt*1000/cfg.new_fs) for xt in xtickspos], fontsize=15)
         ax.tick_params(axis='both', labelsize=15)
-    plt.show()
+    if save==True:
+        return fig, axes
+    else:
+        plt.show()
