@@ -1,6 +1,7 @@
 .ipynb_checkpoints
 *psd
 *png
+*jpg
 *.pdf
 *asv
 __pycache__
