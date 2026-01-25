@@ -927,6 +927,38 @@ def check_attributes(obj, *attrs):
             f"{obj.__class__.__name__} has unset attributes: {missing}"
         )
 
+
+def double_centering(G: np.ndarray, epsilon=10e-4) -> np.ndarray:
+    N = G.shape[0]
+    G_dcnt = (
+        -0.5 * (np.eye(N) - 1 / N * np.ones(N)).T @ G @ (np.eye(N) - 1 / N * np.ones(N))
+    )
+    # to check if it's really centered
+    control_double_centering(G_dcnt, epsilon)
+    return G_dcnt
+# EOF
+
+
+"""
+control_double_centering
+Controls if G_dcnt is correctly double-centered up to a certain threshold epsilon.
+INPUT:
+- G_dcnt: np.ndarray -> double-centered Gram matrix
+- epsilon: float -> threshold of acceptance
+
+OUTPUT:
+none 
+
+"""
+def control_double_centering(G_dcnt: np.ndarray, epsilon: float):
+    if any(np.abs(np.sum(G_dcnt, axis=0)) > epsilon) or any(
+        np.abs(np.sum(G_dcnt, axis=1)) > epsilon
+    ):
+        raise ValueError("the matrix isn't double-centered")
+# EOF
+
+
+
 # ---- CLASSES ----
 
 """
