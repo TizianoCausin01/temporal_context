@@ -927,7 +927,6 @@ def check_attributes(obj, *attrs):
             f"{obj.__class__.__name__} has unset attributes: {missing}"
         )
 
-
 def double_centering(G: np.ndarray, epsilon=10e-4) -> np.ndarray:
     N = G.shape[0]
     G_dcnt = (
