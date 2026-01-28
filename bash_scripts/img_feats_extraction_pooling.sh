@@ -14,7 +14,7 @@ module load gcc/14.2.0
 module load python/3.13.1
 module load openmpi
 source ~/virtual_envs/temporal_context/bin/activate
-mpiexec python3 run_img_feats_extraction.py --model_name=$1 --num_components=$2 --batch_size=$3 --img_size=$4 --monkey_name=$5 --date=$6 --folder_name=$7 --pkg=$8 --pooling=$9
+mpiexec python3 run_img_feats_extraction_pooling.py --model_name=$1 --num_components=$2 --batch_size=$3 --img_size=$4 --monkey_name=$5 --date=$6 --folder_name=$7 --pkg=$8 --pooling=$9
 # example call 
 # sbatch img_feats_extraction.sh vit_l_16 1000 1100 384 paul 230204 fewer_occlusion timm 
 
