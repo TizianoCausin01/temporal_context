@@ -4,7 +4,7 @@
 #SBATCH --time=5:00:00
 #SBATCH --ntasks=10 # number of processes
 #SBATCH --cpus-per-task=1
-#SBATCH --mem=250G
+#SBATCH --mem=150G
 #SBATCH --account=livingstone       # account name
 #SBATCH --partition=priority # partition name
 #SBATCH --job-name=dRSA_across_areas
