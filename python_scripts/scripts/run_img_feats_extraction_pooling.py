@@ -19,13 +19,10 @@ from parallel.parallel_funcs import master_workers_queue
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Run Incremental PCA for CNN layers")
+    parser = argparse.ArgumentParser()
     parser.add_argument("--model_name", type=str)
-    parser.add_argument("--num_components", type=int) # number of PCA components
     parser.add_argument("--batch_size", type=int)
     parser.add_argument("--img_size", type=int)
-    parser.add_argument("--monkey_name", type=str)
-    parser.add_argument("--date", type=str)
     parser.add_argument("--folder_name", type=str)
     parser.add_argument("--pkg", type=str)
     parser.add_argument("--pooling", type=str)
@@ -43,11 +40,10 @@ if __name__ == "__main__":
         is_valid_file=lambda x: not x.endswith("Thumbs.db"), 
         allow_empty=True, 
     )
-    mapping_idx = map_image_order_from_ann_to_monkey(paths, args.monkey_name, args.date, dataset)
     dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=False)
     if args.pkg=='torchvision':
         load_mod_function = load_torchvision_model
     elif args.pkg=='timm':
         load_mod_function = load_timm_model
     model = load_mod_function(args.model_name, device, img_size=args.img_size)
-    master_workers_queue(task_list, paths, img_feats_extraction_pooling, *(args.model_name, model, dataloader, mapping_idx, args.monkey_name, args.date, args.img_size, args.num_components, args.pooling, device)) 
+    master_workers_queue(task_list, paths, img_feats_extraction_pooling, *(args.model_name, model, dataloader, args.folder_name, args.img_size, args.pooling, device)) 
