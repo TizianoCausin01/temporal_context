@@ -524,27 +524,16 @@ def img_feats_extraction(paths, rank, layer_name, model_name, model, dataloader,
 # EOF
 
 
-
-def img_feats_extraction_pooling(paths, rank, layer_name, model_name, model, dataloader, mapping_idx, monkey_name, date, img_size, n_components, pooling, device):
-    feats_save_name = f"{paths['livingstone_lab']}/tiziano/models/{monkey_name}_{date}_{model_name}_{img_size}_{layer_name}_features_{pooling}pool.npz"
-    RDM_save_name = f"{paths['livingstone_lab']}/tiziano/models/{monkey_name}_{date}_{model_name}_{img_size}_{layer_name}_RDM_{pooling}pool.npz"
-    paths_exist = all([
-        os.path.exists(feats_save_name),
-        os.path.exists(RDM_save_name),
-    ])
-    if paths_exist:
+def img_feats_extraction_pooling(paths, rank, layer_name, model_name, model, dataloader, dataset_name, img_size, pooling, device):
+    feats_save_name = f"{paths['livingstone_lab']}/tiziano/models/{dataset_name}_{model_name}_{img_size}_{layer_name}_features_{pooling}pool.npz"
+    if os.path.exists(feats_save_name):
         print_wise(f"feature already computed at {feats_save_name}")
     else:
         feature_extractor = create_feature_extractor(model, return_nodes=[layer_name]).to(device)
         all_feats = img_dataloader_feature_extraction_loop(rank, feature_extractor, layer_name, dataloader, device, pooling=pooling)
-        all_feats = all_feats[mapping_idx, :]
-        RDM_vec = create_RDM(all_feats.T)
-        np.savez_compressed(RDM_save_name, RDM_vec)
-        print_wise(f"saved RDM at {RDM_save_name}", rank=rank)
         np.savez_compressed(feats_save_name, all_feats.T)
         print_wise(f"saved features at {feats_save_name}", rank=rank)
 # EOF
-
 
 
 """
