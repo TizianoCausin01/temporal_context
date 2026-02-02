@@ -1001,6 +1001,18 @@ class BrainAreas:
             target_brain_area = self.areas_idx[brain_area_name]
         except KeyError:
             raise KeyError(f"Brain area '{brain_area_name}' not found for monkey '{self.monkey_name}'.", f"Supported brain areas: {list(self.areas_idx.keys())}") from None
+            
+        except TypeError:
+            if isinstance(brain_area_name, list) and len(brain_area_name) == 2:
+                for idx in brain_area_name:
+                    if idx > self.areas_idx["n_chan"][0]:
+                        raise ValueError(f"Indices passed {brain_area_name} don't match the original number of channels ({self.areas_idx["n_chan"]}).")
+                    # end if idx > self.areas_idx["n_chan"][0]:
+                # end for idx in brain_area_name:
+                target_brain_area = [brain_area_name] # it's setting the limits in terms of channels idx where we don't have precise info about a brain area, wrapping them in a list of lists
+            else:
+                raise TypeError(f"brain_area_name should be either a str or a list of len 2.")
+            # end if isinstance(brain_area_name, list) and len(brain_area_name) == 2:
         # end try:
         brain_area_response = []
         for lims in target_brain_area:
