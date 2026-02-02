@@ -1,6 +1,8 @@
 import os, yaml, sys
 import numpy as np
 import torch
+import re
+from pathlib import Path
 import joblib
 import h5py
 import cv2
@@ -537,6 +539,26 @@ def img_feats_extraction_pooling(paths, rank, layer_name, model_name, model, dat
 
 
 """
+rename_talia_dataset
+just renaming the names the same way I did in the folder also in the uniqueImages file, 
+otherwise I wouldn't be able to do the correct mapping. 
+We add an underscore between the image name and the number and we take off the spaces.
+"""
+def rename_talia_dataset(monkey_presentation_order):
+    monkey_presentation_order_renamed = []
+    for f in monkey_presentation_order:
+        # Step 1: insert underscore before first number following a letter
+        newname = re.sub(r'([a-zA-Z])([0-9])', r'\1_\2', f)
+        # Step 2: remove spaces
+        newname = newname.replace(' ', '')
+        # Rename if changed
+        monkey_presentation_order_renamed.append(newname)
+    # end for f in monkey_presentation_order:
+    return monkey_presentation_order_renamed
+# EOF
+
+
+"""
 map_image_order_from_ann_to_monkey
 Creates an index mapping to align ANN image order with monkey presentation order.
 
@@ -567,6 +589,9 @@ def map_image_order_from_ann_to_monkey(paths, monkey_name, date, dataset):
         monkey_presentation_order = decode_matlab_strings(f, refs)
         monkey_presentation_order = sorted(set(monkey_presentation_order))
     ann_presentation_order = [os.path.basename(path) for path, _ in dataset.samples] # creates the order with which images are presented to the ANN
+    if os.path.basename(Path(dataset.root))=="talia_20each_tizi": # little detour because I have changed the filenames for talia_20each_tizi
+        monkey_presentation_order = rename_talia_dataset(monkey_presentation_order)
+    # end if dataset=="talia_20each_tizi":
     mapping_idx = [ann_presentation_order.index(x) for x in monkey_presentation_order] # Creates a mapping from the monkey to the ann presentation order
     newly_ordered_ann = [ann_presentation_order[i] for i in mapping_idx]
     assert newly_ordered_ann == monkey_presentation_order
