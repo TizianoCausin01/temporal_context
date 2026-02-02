@@ -4,7 +4,7 @@ from scipy.spatial.distance import squareform
 
 sys.path.append("..")
 from general_utils.utils import print_wise, TimeSeries, dRSA, load_img_natraster, check_attributes, subsample_RDM
-
+from general_utils.II import dynInformationImbalance
 
 
 """
@@ -127,4 +127,33 @@ def similarity_subsamples_par(paths: dict[str: str], rank: int, layer_name: str,
         np.savez_compressed(dict_savename, **{str(k): v for k, v in iter_dict.items()})
         print_wise(f"computed all iterations for layer {layer_name}, \nsaved at {dict_savename}", rank=rank)
     # end if os.path.exists(dict_savename):
+# EOF
+
+
+
+def init_static_dRSA_dynII(ba_raster, signal_RDM_metric, model_RDM_metric, k):
+    drsa_obj = dRSA(signal_RDM_metric, model_RDM_metric)
+    drsa_obj.compute_RDM_timeseries(ba_raster, "signal")
+    dyn_ii_obj = dynInformationImbalance(signal_RDM_metric, model_RDM_metric, k)
+    dyn_ii_obj.set_RDM_timeseries(drsa_obj.get_RDM_timeseries("signal"), "signal")
+    dyn_ii_obj.compute_distance_ranks_timeseries("signal")
+    return drsa_obj, dyn_ii_obj
+# EOF
+
+
+def compute_static_dRSA_dynII(paths, layer_name, drsa_obj, dyn_ii_obj, idx_ord, folder_name, model_name, img_size, pooling):
+    if not hasattr(drsa_obj, "signal_RDM_timeseries"):
+        raise AttributeError("drsa_obj must have 'signal_RDM_timeseries'")
+    # end if not hasattr(drsa_obj, "signal_RDM_timeseries"):
+    if not hasattr(dyn_ii_obj, "signal_distance_ranks_timeseries"):
+        raise AttributeError("dyn_ii_obj must have 'signal_distance_ranks_timeseries'")
+    # end if not hasattr(dyn_ii_obj, "signal_distance_ranks_timeseries"):
+    feats_filename = f"{paths['livingstone_lab']}/tiziano/models/{folder_name}_{model_name}_{img_size}_{layer_name}_features_{pooling}pool.npz"
+    features = np.load(feats_filename)["arr_0"][:, idx_ord]
+    drsa_obj.compute_RDM(features, "model")
+    drsa = drsa_obj.compute_static_dRSA()
+    dyn_ii_obj.set_RDM(drsa_obj.get_RDM("model"), "model")
+    dyn_ii_obj.compute_distance_ranks("model")
+    dyn_ii = dyn_ii_obj.compute_both_static_dynII()
+    return drsa, dyn_ii[0], dyn_ii[1] # dRSA, A2B and B2A respectively
 # EOF
