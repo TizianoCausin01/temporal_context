@@ -2,7 +2,7 @@ import os, yaml, sys
 import numpy as np
 from scipy.spatial.distance import squareform
 sys.path.append("..")
-from general_utils.utils import RSA, dRSA, TimeSeries
+from general_utils.utils import RSA, dRSA, TimeSeries, print_wise
 
 """
 InformationImbalance
@@ -271,3 +271,30 @@ class dynInformationImbalance(InformationImbalance, dRSA):
     # EOF
 # EOC
 
+
+def init_static_dynII(ba_raster: "TimeSeries", signal_RDM_metric, model_RDM_metric, k) -> "dynInformationImbalance":
+    dyn_ii_obj = dynInformationImbalance(signal_RDM_metric, model_RDM_metric, k)
+    dyn_ii_obj.compute_RDM_timeseries(ba_raster, "signal")
+    dyn_ii_obj.compute_distance_ranks_timeseries("signal")
+    return  dyn_ii_obj
+# EOF
+
+def compute_static_dynII(paths: dict[str: str], rank: int, layer_name: str, dyn_ii_obj: "dynInformationImbalance", idx_ord: np.ndarray[int], monkey_name, date, brain_area, folder_name: str, model_name: str, img_size: int, pooling: str) -> tuple["TimeSeries", "TimeSeries"]:    
+    save_name_A2B = f"{paths['livingstone_lab']}/tiziano/results/dynII_A2B_k{dyn_ii_obj.k}_{dyn_ii_obj.signal_RDM_metric}-{dyn_ii_obj.model_RDM_metric}_{monkey_name}_{date}_{brain_area}_{model_name}_{img_size}_{layer_name}_{dyn_ii_obj.get_RDM_timeseries("signal").get_fs()}Hz.npz"
+    save_name_B2A = f"{paths['livingstone_lab']}/tiziano/results/dynII_B2A_k{dyn_ii_obj.k}_{dyn_ii_obj.signal_RDM_metric}-{dyn_ii_obj.model_RDM_metric}_{monkey_name}_{date}_{model_name}_{img_size}_{layer_name}_{dyn_ii_obj.get_RDM_timeseries("signal").get_fs()}Hz.npz"
+    if os.path.exists(save_name_A2B) and os.path.exists(save_name_B2A):
+        print_wise(f"model already exists at {save_name_A2B}", rank=rank)
+    else:
+        if not hasattr(dyn_ii_obj, "signal_distance_ranks_timeseries"):
+            raise AttributeError("dyn_ii_obj must have 'signal_distance_ranks_timeseries'")
+        # end if not hasattr(dyn_ii_obj, "signal_distance_ranks_timeseries"):
+        feats_filename = f"{paths['livingstone_lab']}/tiziano/models/{folder_name}_{model_name}_{img_size}_{layer_name}_features_{pooling}pool.npz"
+        features = np.load(feats_filename)["arr_0"][:, idx_ord]
+        dyn_ii_obj.compute_RDM(features, "model")
+        dyn_ii_obj.compute_distance_ranks("model")
+        dyn_ii = dyn_ii_obj.compute_both_static_dynII()
+        np.savez_compressed(save_name_A2B, dyn_ii[0].get_array())
+        np.savez_compressed(save_name_B2A, dyn_ii[1].get_array())
+        print_wise(f"model saved at {save_name_A2B}", rank=rank)
+    # end if os.path.exists(save_name_A2B) and os.path.exists(save_name_B2A):
+# EOF

@@ -214,19 +214,53 @@ Raises:
 - AttributeError
     If required signal-side attributes are missing from drsa_obj or dyn_ii_obj
 """
-def compute_static_dRSA_dynII(paths, layer_name, drsa_obj, dyn_ii_obj, idx_ord, folder_name, model_name, img_size, pooling) -> tuple["TimeSeries", "TimeSeries", "TimeSeries"]:
-    if not hasattr(drsa_obj, "signal_RDM_timeseries"):
-        raise AttributeError("drsa_obj must have 'signal_RDM_timeseries'")
-    # end if not hasattr(drsa_obj, "signal_RDM_timeseries"):
-    if not hasattr(dyn_ii_obj, "signal_distance_ranks_timeseries"):
-        raise AttributeError("dyn_ii_obj must have 'signal_distance_ranks_timeseries'")
-    # end if not hasattr(dyn_ii_obj, "signal_distance_ranks_timeseries"):
-    feats_filename = f"{paths['livingstone_lab']}/tiziano/models/{folder_name}_{model_name}_{img_size}_{layer_name}_features_{pooling}pool.npz"
-    features = np.load(feats_filename)["arr_0"][:, idx_ord]
-    drsa_obj.compute_RDM(features, "model")
-    drsa = drsa_obj.compute_static_dRSA()
-    dyn_ii_obj.set_RDM(drsa_obj.get_RDM("model"), "model")
-    dyn_ii_obj.compute_distance_ranks("model")
-    dyn_ii = dyn_ii_obj.compute_both_static_dynII()
-    return drsa, dyn_ii[0], dyn_ii[1] # dRSA, A2B and B2A respectively
+def compute_static_dRSA_dynII(paths, rank, layer_name, drsa_obj, dyn_ii_obj, idx_ord, monkey_name, date, brain_area, folder_name, model_name, img_size, pooling) -> tuple["TimeSeries", "TimeSeries", "TimeSeries"]:
+    save_name_A2B = f"{paths['livingstone_lab']}/tiziano/results/dynII_A2B_k{dyn_ii_obj.k}_{drsa_obj.signal_RDM_metric}-{drsa_obj.model_RDM_metric}_{monkey_name}_{date}_{brain_area}_{model_name}_{img_size}_{layer_name}_{dyn_ii_obj.get_RDM_timeseries("signal").get_fs()}Hz.npz"
+    save_name_B2A = f"{paths['livingstone_lab']}/tiziano/results/dynII_B2A_k{dyn_ii_obj.k}_{drsa_obj.signal_RDM_metric}-{drsa_obj.model_RDM_metric}_{monkey_name}_{date}_{brain_area}_{model_name}_{img_size}_{layer_name}_{dyn_ii_obj.get_RDM_timeseries("signal").get_fs()}Hz.npz"
+    save_name_drsa = f"{paths['livingstone_lab']}/tiziano/results/static_dRSA_{drsa_obj.signal_RDM_metric}-{drsa_obj.model_RDM_metric}_{monkey_name}_{date}_{brain_area}_{model_name}_{img_size}_{layer_name}_{drsa_obj.get_RDM_timeseries("signal").get_fs()}Hz.npz"
+    if os.path.exists(save_name_drsa) and os.path.exists(save_name_A2B) and os.path.exists(save_name_B2A):
+        print_wise(f"model already exists at {save_name_A2B}", rank=rank)
+    else:
+        if not hasattr(drsa_obj, "signal_RDM_timeseries"):
+            raise AttributeError("drsa_obj must have 'signal_RDM_timeseries'")
+        # end if not hasattr(drsa_obj, "signal_RDM_timeseries"):
+        if not hasattr(dyn_ii_obj, "signal_distance_ranks_timeseries"):
+            raise AttributeError("dyn_ii_obj must have 'signal_distance_ranks_timeseries'")
+        # end if not hasattr(dyn_ii_obj, "signal_distance_ranks_timeseries"):
+        feats_filename = f"{paths['livingstone_lab']}/tiziano/models/{folder_name}_{model_name}_{img_size}_{layer_name}_features_{pooling}pool.npz"
+        features = np.load(feats_filename)["arr_0"][:, idx_ord]
+        drsa_obj.compute_RDM(features, "model")
+        drsa = drsa_obj.compute_static_dRSA()
+        dyn_ii_obj.set_RDM(drsa_obj.get_RDM("model"), "model")
+        dyn_ii_obj.compute_distance_ranks("model")
+        dyn_ii = dyn_ii_obj.compute_both_static_dynII()
+        np.savez_compressed(save_name_drsa, drsa.get_array())
+        np.savez_compressed(save_name_A2B, dyn_ii[0].get_array())
+        np.savez_compressed(save_name_B2A, dyn_ii[1].get_array())
+        print_wise(f"model saved at {save_name_A2B} and {save_name_drsa}", rank=rank)
+    # end if os.path.exists(save_name_drsa) and os.path.exists(save_name_A2B) and os.path.exists(save_name_B2A):
+# EOF
+
+
+def init_static_dRSA(ba_raster: "TimeSeries", signal_RDM_metric, model_RDM_metric) -> "dRSA":
+    drsa_obj = dRSA(signal_RDM_metric, model_RDM_metric)
+    drsa_obj.compute_RDM_timeseries(ba_raster, "signal")
+    return  drsa_obj
+# EOF
+
+def compute_static_dRSA(paths: dict[str: str], rank: int, layer_name: str, drsa_obj, idx_ord: np.ndarray[int], monkey_name, date: str, brain_area: str, folder_name: str, model_name: str, img_size: int, pooling: str) -> "TimeSeries":    
+    save_name = f"{paths['livingstone_lab']}/tiziano/results/static_dRSA_{drsa_obj.signal_RDM_metric}-{drsa_obj.model_RDM_metric}_{monkey_name}_{date}_{brain_area}_{model_name}_{img_size}_{layer_name}_{drsa_obj.get_RDM_timeseries('signal').get_fs()}Hz.npz"
+    if os.path.exists(save_name):
+        print_wise(f"model already exists at {save_name}", rank=rank)
+    else:
+        if not hasattr(drsa_obj, "signal_RDM_timeseries"):
+            raise AttributeError("drsa_obj must have 'signal_RDM_timeseries'")
+        # end if not hasattr(drsa_obj, "signal_RDM_timeseries"):
+        feats_filename = f"{paths['livingstone_lab']}/tiziano/models/{folder_name}_{model_name}_{img_size}_{layer_name}_features_{pooling}pool.npz"
+        features = np.load(feats_filename)["arr_0"][:, idx_ord]
+        drsa_obj.compute_RDM(features, "model")
+        drsa = drsa_obj.compute_static_dRSA()
+        np.savez_compressed(save_name, drsa.get_array())
+        print_wise(f"model saved at {save_name}", rank=rank)
+    # end if os.path.exists(save_name):
 # EOF
