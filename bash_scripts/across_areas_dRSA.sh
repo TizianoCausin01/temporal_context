@@ -1,10 +1,10 @@
 #!/bin/bash
 
 #SBATCH --nodes=1
-#SBATCH --time=5:00:00
-#SBATCH --ntasks=10 # number of processes
+#SBATCH --time=15:00:00
+#SBATCH --ntasks=3 # number of processes
 #SBATCH --cpus-per-task=1
-#SBATCH --mem=150G
+#SBATCH --mem=250G
 #SBATCH --account=livingstone       # account name
 #SBATCH --partition=priority # partition name
 #SBATCH --job-name=dRSA_across_areas
