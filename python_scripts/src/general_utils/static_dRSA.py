@@ -130,8 +130,38 @@ def similarity_subsamples_par(paths: dict[str: str], rank: int, layer_name: str,
 # EOF
 
 
+"""
+init_static_dRSA_dynII
+Initializer for static dRSA and dynamic Information Imbalance (dynII) objects.
+This function sets up the shared signal-side computations required for both
+static dRSA and dynamic II analyses. Specifically:
+1) Initializes a dRSA object with the specified signal and model RDM metrics
+2) Computes the signal RDM time series from the provided brain-area raster
+3) Initializes a dynInformationImbalance object
+4) Transfers the signal RDM time series to the dynII object
+5) Computes the signal-side distance-rank time series for dynII
 
-def init_static_dRSA_dynII(ba_raster, signal_RDM_metric, model_RDM_metric, k):
+INPUT:
+- ba_raster: TimeSeries
+    Neural data raster for a given brain area
+    Shape typically (n_trials, n_timepoints, n_features) or equivalent
+- signal_RDM_metric: str or callable
+    Distance metric used to compute signal RDMs
+- model_RDM_metric: str or callable
+    Distance metric used to compute model RDMs
+- k: int
+    Number of nearest neighbors used for Information Imbalance computation
+
+OUTPUT:
+- drsa_obj: dRSA
+    Initialized dRSA object with signal RDM time series computed
+- dyn_ii_obj: dynInformationImbalance
+    Initialized dynII object with signal distance-rank time series computed
+
+Side effects:
+- Computes and stores signal-side RDMs and distance ranks inside the objects
+"""
+def init_static_dRSA_dynII(ba_raster: "TimeSeries", signal_RDM_metric, model_RDM_metric, k: int) -> tuple["dRSA", "dynInformationImbalance"]:
     drsa_obj = dRSA(signal_RDM_metric, model_RDM_metric)
     drsa_obj.compute_RDM_timeseries(ba_raster, "signal")
     dyn_ii_obj = dynInformationImbalance(signal_RDM_metric, model_RDM_metric, k)
@@ -140,8 +170,51 @@ def init_static_dRSA_dynII(ba_raster, signal_RDM_metric, model_RDM_metric, k):
     return drsa_obj, dyn_ii_obj
 # EOF
 
+"""
+compute_static_dRSA_dynII
+Compute static dRSA and dynamic Information Imbalance for a single model layer.
+This function performs the model-side computations required to compare a given
+model layer to previously computed neural (signal) RDM time series.
+1) Loads model features for the specified layer
+2) Reorders features according to the provided trial index mapping
+3) Computes the model RDM
+4) Computes the static dRSA between signal and model RDMs
+5) Sets the model RDM in the dynII object
+6) Computes model-side distance ranks
+7) Computes both directions of static dynamic Information Imbalance (A→B, B→A)
 
-def compute_static_dRSA_dynII(paths, layer_name, drsa_obj, dyn_ii_obj, idx_ord, folder_name, model_name, img_size, pooling):
+INPUT:
+- paths: dict
+- layer_name: str
+    Name of the model layer being analyzed
+- drsa_obj: dRSA
+    Initialized dRSA object with signal RDM time series already computed
+- dyn_ii_obj: dynInformationImbalance
+    Initialized dynII object with signal distance-rank time series already computed
+- idx_ord: list[int] or np.ndarray[int]
+    Index mapping used to reorder model trials to match neural presentation order
+- folder_name: str
+    Name of the stimulus folder used to build the model feature filename
+- model_name: str
+    Name of the model (e.g., 'vit_l_16', 'resnet50')
+- img_size: int
+    Input image size used for the model
+- pooling: str
+    Pooling strategy used when extracting model features
+
+OUTPUT:
+- drsa: TimeSeries 
+    Static dRSA time course
+- dyn_ii_A2B: TimeSeries
+    Static dynamic Information Imbalance from signal → model
+- dyn_ii_B2A: TimeSeries 
+    Static dynamic Information Imbalance from model → signal
+
+Raises:
+- AttributeError
+    If required signal-side attributes are missing from drsa_obj or dyn_ii_obj
+"""
+def compute_static_dRSA_dynII(paths, layer_name, drsa_obj, dyn_ii_obj, idx_ord, folder_name, model_name, img_size, pooling) -> tuple["TimeSeries", "TimeSeries", "TimeSeries"]:
     if not hasattr(drsa_obj, "signal_RDM_timeseries"):
         raise AttributeError("drsa_obj must have 'signal_RDM_timeseries'")
     # end if not hasattr(drsa_obj, "signal_RDM_timeseries"):
