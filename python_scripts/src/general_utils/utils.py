@@ -121,12 +121,20 @@ def create_RDM(data, metric='correlation'):
         RDM_vec = index_gram(RDM)
     elif metric == 'cosine':
         RDM_vec = cosine_sim(data)
+    elif metric == 'cosine_cnt':
+        data = mean_centering(data)
+        RDM_vec = cosine_sim(data)
     else:
         RDM_vec = pdist(data.T, metric=metric)
     # end if metric == 'pearson':
     return RDM_vec
 # EOF
 
+
+def mean_centering(x: np.ndarray, axis=1):
+    x_cnt = x - x.mean(axis=axis, keepdims=True)
+    return x_cnt
+# EOF
 
 """
 spearman
@@ -739,6 +747,7 @@ def cosine_sim(x):
     gram = index_gram(gram)
     return gram
 # EOF
+
 
 """
 compute_samples_sizes
