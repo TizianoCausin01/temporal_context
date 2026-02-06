@@ -12,6 +12,10 @@ for f in *.jpg; do
     mv "$f" "$newname"
 done
 
+for f in *\ *; do
+    mv "$f" "${f// /}"
+done
+
 # Loop over all files in current folder and creates a folder for each unique filename
 for f in *; do
     # Skip if not a file
