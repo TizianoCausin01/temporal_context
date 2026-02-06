@@ -298,3 +298,24 @@ def compute_static_dynII(paths: dict[str: str], rank: int, layer_name: str, dyn_
         print_wise(f"model saved at {save_name_A2B}", rank=rank)
     # end if os.path.exists(save_name_A2B) and os.path.exists(save_name_B2A):
 # EOF
+
+
+def dyn_compare_similarity_metrics(paths, rank, metrics_tuple, raster, k, monkey_name, date, brain_area, new_fs):
+    save_name_A2B = f"{paths['livingstone_lab']}/tiziano/results/metric_comparison_k{k}_{metrics_tuple[0]}-{metrics_tuple[1]}_{monkey_name}_{date}_{brain_area}_{new_fs}Hz.npz"
+    save_name_B2A = f"{paths['livingstone_lab']}/tiziano/results/metric_comparison_k{k}_{metrics_tuple[1]}-{metrics_tuple[0]}_{monkey_name}_{date}_{brain_area}_{new_fs}Hz.npz"
+    if os.path.exists(save_name_A2B) and os.path.exists(save_name_B2A):
+        print_wise(f"model already exists at {save_name_A2B}", rank=rank)
+    else:
+        A2B_list = []
+        B2A_list = []
+        for idx, resp_t in enumerate(raster):
+            _, A2B, B2A =compare_similarity_metrics(resp_t, metrics_tuple[0], metrics_tuple[1], k)
+            A2B_list.append(A2B)
+            B2A_list.append(B2A)
+        # end for idx, resp_t in enumerate(ba_raster):
+        np.savez_compressed(save_name_A2B, np.stack(A2B_list))
+        np.savez_compressed(save_name_B2A, np.stack(B2A_list))
+        print_wise(f"comparison saved at {save_name_A2B}", rank=rank)
+    # end if os.path.exists(save_name_A2B) and os.path.exists(save_name_B2A):
+# EOF
+
