@@ -161,12 +161,13 @@ OUTPUT:
 Side effects:
 - Computes and stores signal-side RDMs and distance ranks inside the objects
 """
-def init_static_dRSA_dynII(ba_raster: "TimeSeries", signal_RDM_metric, model_RDM_metric, k: int) -> tuple["dRSA", "dynInformationImbalance"]:
+def init_static_dRSA_dynII(rank, ba_raster: "TimeSeries", signal_RDM_metric, model_RDM_metric, k: int) -> tuple["dRSA", "dynInformationImbalance"]:
     drsa_obj = dRSA(signal_RDM_metric, model_RDM_metric)
-    drsa_obj.compute_RDM_timeseries(ba_raster, "signal")
     dyn_ii_obj = dynInformationImbalance(signal_RDM_metric, model_RDM_metric, k)
-    dyn_ii_obj.set_RDM_timeseries(drsa_obj.get_RDM_timeseries("signal"), "signal")
-    dyn_ii_obj.compute_distance_ranks_timeseries("signal")
+    if rank != 0: # to avoid that the master computes it (memory saving) 
+        drsa_obj.compute_RDM_timeseries(ba_raster, "signal")
+        dyn_ii_obj.set_RDM_timeseries(drsa_obj.get_RDM_timeseries("signal"), "signal")
+        dyn_ii_obj.compute_distance_ranks_timeseries("signal")
     return drsa_obj, dyn_ii_obj
 # EOF
 

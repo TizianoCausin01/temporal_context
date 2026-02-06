@@ -8,7 +8,7 @@ paths = config[ENV]["paths"]
 sys.path.append(paths["src_path"])
 from general_utils.utils import get_relevant_output_layers, compute_samples_sizes, load_img_natraster
 from general_utils.static_dRSA import init_static_dRSA_dynII, compute_static_dRSA_dynII
-from parallel.parallel_funcs import master_workers_queue
+from parallel.parallel_funcs import master_workers_queue, parallel_setup
 from image_processing.computational_models import map_image_order_from_ann_to_monkey
 
 # e.g. to call it:
@@ -31,6 +31,7 @@ if __name__ == "__main__":
 
     cfg = parser.parse_args()
 
+    comm, rank, size = parallel_setup()
     task_list = get_relevant_output_layers(cfg.model_name, cfg.pkg)
     area_rasters = load_img_natraster(paths, cfg.monkey_name, cfg.date, new_fs=cfg.new_fs, brain_area=cfg.brain_area)
 
@@ -42,6 +43,6 @@ if __name__ == "__main__":
 
     idx_ord = map_image_order_from_ann_to_monkey(paths, cfg.monkey_name, cfg.date, dataset)
 
-    drsa_obj, dyn_ii_obj = init_static_dRSA_dynII(area_rasters, cfg.signal_RDM_metric, cfg.model_RDM_metric, cfg.k)
+    drsa_obj, dyn_ii_obj = init_static_dRSA_dynII(rank, area_rasters, cfg.signal_RDM_metric, cfg.model_RDM_metric, cfg.k)
 
     master_workers_queue(task_list, paths, compute_static_dRSA_dynII, *(drsa_obj, dyn_ii_obj, idx_ord, cfg.monkey_name, cfg.date, cfg.brain_area, cfg.folder_name, cfg.model_name, cfg.img_size, cfg.pooling)) 
