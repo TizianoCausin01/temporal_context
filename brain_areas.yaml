@@ -30,7 +30,7 @@ baby1:
 og:
   n_chan:
       - 65
-  AIT:
+  CIT:
       - [0, 64]
 
 octavius:
