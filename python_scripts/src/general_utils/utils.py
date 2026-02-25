@@ -750,6 +750,43 @@ def cosine_sim(x):
 
 
 """
+magnitude_diff
+
+Computes the pairwise absolute difference of the L2 norms of the
+column vectors of x and returns the upper-triangular entries
+(excluding the diagonal).
+INPUT:
+    - x: np.ndarray (d, n) -> Data matrix
+OUTPUT:
+    - gram: np.ndarray, shape (n*(n-1)//2,) -> Vector containing the absolute difference of the norms | ||x_i|| - ||x_j|| |
+"""
+@njit
+def magnitude_diff(x: np.ndarray) -> np.ndarray:
+    d, n = x.shape
+    norms = np.zeros(n)
+    # Compute column-wise L2 norms
+    for j in range(n): 
+        s = 0.0
+        for i in range(d): # loops through the dimensions of the current column j and sums their square until it finishes the dot prod x[:, j] @ x[:, j] 
+            s += x[i, j] * x[i, j]
+        # end for i in range(d):
+        norms[j] = np.sqrt(s) 
+    # end for j in range(n): 
+    # Compute upper-triangular absolute differences
+    n_pairs = n * (n - 1) // 2
+    gram = np.zeros(n_pairs)
+    idx = 0
+    for i in range(n):
+        for j in range(i+1, n):
+            gram[idx] = abs(norms[i] - norms[j])
+            idx += 1
+        # end for j in range(i+1, n):
+    # end for i in range(n):
+    return gram
+# EOF
+
+
+"""
 compute_samples_sizes
 Computes a sequence of sample sizes used for iterative or scaling analyses.
 
