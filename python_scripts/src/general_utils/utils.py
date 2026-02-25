@@ -124,6 +124,8 @@ def create_RDM(data, metric='correlation'):
     elif metric == 'cosine_cnt':
         data = mean_centering(data)
         RDM_vec = cosine_sim(data)
+    elif metric == 'magnitude_diff':
+        RDM_vec = magnitude_diff(data)
     else:
         RDM_vec = pdist(data.T, metric=metric)
     # end if metric == 'pearson':
