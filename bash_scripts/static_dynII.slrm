@@ -1,0 +1,19 @@
+#!/bin/bash
+
+#SBATCH --nodes=1
+#SBATCH --time=8:00:00
+#SBATCH --ntasks=2 # number of processes
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=250G
+#SBATCH --account=livingstone       # account name
+#SBATCH --partition=short # partition name
+#SBATCH --job-name=static_dRSA_dynII
+#SBATCH --output=/home/tic569/output_jobs/%x.%j.out   # file name will be *job_name*.*job_id*
+cd /home/tic569/temporal_context/python_scripts/scripts
+module load gcc/14.2.0
+module load python/3.13.1
+module load openmpi
+source ~/virtual_envs/temporal_context/bin/activate
+mpiexec python3 run_static_dynII.py --monkey_name=$1 --date=$2 --brain_area=$3 --folder_name=$4 --signal_RDM_metric=$5 --model_RDM_metric=$6 --k=$7 --model_name=$8 --img_size=$9 --pooling=${10} --new_fs=${11} --pkg=${12} 
+
+# sbatch static_dynII.slrm paul 230204 AIT fewer_occlusion euclidean cosine 1 vit_l_16 384 mean 100 timm 

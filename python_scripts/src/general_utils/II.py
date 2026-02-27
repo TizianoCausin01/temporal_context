@@ -281,7 +281,7 @@ def init_static_dynII(ba_raster: "TimeSeries", signal_RDM_metric, model_RDM_metr
 
 def compute_static_dynII(paths: dict[str: str], rank: int, layer_name: str, dyn_ii_obj: "dynInformationImbalance", idx_ord: np.ndarray[int], monkey_name, date, brain_area, folder_name: str, model_name: str, img_size: int, pooling: str) -> tuple["TimeSeries", "TimeSeries"]:    
     save_name_A2B = f"{paths['livingstone_lab']}/tiziano/results/dynII_A2B_k{dyn_ii_obj.k}_{dyn_ii_obj.signal_RDM_metric}-{dyn_ii_obj.model_RDM_metric}_{monkey_name}_{date}_{brain_area}_{model_name}_{img_size}_{layer_name}_{dyn_ii_obj.get_RDM_timeseries("signal").get_fs()}Hz.npz"
-    save_name_B2A = f"{paths['livingstone_lab']}/tiziano/results/dynII_B2A_k{dyn_ii_obj.k}_{dyn_ii_obj.signal_RDM_metric}-{dyn_ii_obj.model_RDM_metric}_{monkey_name}_{date}_{model_name}_{img_size}_{layer_name}_{dyn_ii_obj.get_RDM_timeseries("signal").get_fs()}Hz.npz"
+    save_name_B2A = f"{paths['livingstone_lab']}/tiziano/results/dynII_B2A_k{dyn_ii_obj.k}_{dyn_ii_obj.signal_RDM_metric}-{dyn_ii_obj.model_RDM_metric}_{monkey_name}_{date}_{brain_area}_{model_name}_{img_size}_{layer_name}_{dyn_ii_obj.get_RDM_timeseries("signal").get_fs()}Hz.npz"
     if os.path.exists(save_name_A2B) and os.path.exists(save_name_B2A):
         print_wise(f"model already exists at {save_name_A2B}", rank=rank)
     else:
